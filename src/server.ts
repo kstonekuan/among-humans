@@ -27,8 +27,6 @@ if (!OPENAI_API_KEY) {
 const app = express();
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 
-// No timer duration constants needed since time limits are not enforced
-
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer);
@@ -82,9 +80,6 @@ type Room = {
     topic?: string; // The player topic this question focuses on
     used: boolean; // Whether this question has been used
   }>;
-
-  // Track AI answer generation
-  pendingAIAnswerPromise?: Promise<void>; // Promise for AI answer generation in progress
 
   // Round configuration
   totalRounds: number;
@@ -753,8 +748,8 @@ io.on('connection', (socket) => {
         };
         room.roundsHistory.push(historyEntry);
 
-        // Trigger AI answer generation
-        generateAIAnswer(room, room.currentRoundData.prompt);
+        // No need to trigger scheduled AI answer generation
+        // AI will answer after all humans have submitted their answers
 
         // No round timer for auto-submission
         // Players can take as long as they want to answer
@@ -791,8 +786,8 @@ io.on('connection', (socket) => {
         // Send event to hide start button and AI prompt input for all players
         io.to(room.code).emit('hide_game_controls');
 
-        // Trigger AI answer generation
-        generateAIAnswer(room, room.currentRoundData.prompt);
+        // No need to trigger scheduled AI answer generation
+        // AI will answer after all humans have submitted their answers
 
         // No round timer for auto-submission
         // Players can take as long as they want to answer
@@ -842,11 +837,7 @@ io.on('connection', (socket) => {
 
     // If all humans have answered, immediately generate AI answer and submit it
     if (allHumansAnswered) {
-      // Cancel any pending AI answer timer/generation from the round start
-      if (room.pendingAIAnswerPromise) {
-        // Not a perfect cancellation but prevents double-answering
-        console.log(`[ROOM] All humans answered in room ${room.code}, generating AI answer now`);
-      }
+      console.log(`[ROOM] All humans answered in room ${room.code}, generating AI answer now`);
 
       // Generate and immediately submit AI answer now that we have all human answers
       generateAndSubmitAIAnswer(room, room.currentRoundData.prompt)
@@ -1298,106 +1289,7 @@ async function generateAndSubmitAIAnswer(room: Room, gamePrompt: string | null):
   }
 }
 
-async function generateAIAnswer(room: Room, gamePrompt: string | null): Promise<void> {
-  // Store the promise for potential cancellation
-  room.pendingAIAnswerPromise = (async () => {
-    // Don't generate answer if AI is not active or prompt is null
-    if (!room.aiPlayerActive || !gamePrompt) return;
-
-    // Check if AI should still generate an answer (not all humans have answered)
-    // This is to avoid generating an answer if we've already triggered the immediate answer
-    const allHumansAnswered = Object.values(room.currentRoundData.participants)
-      .filter((p) => !p.isAI)
-      .every((p) => p.hasAnswered);
-
-    if (allHumansAnswered) {
-      console.log(`[ROOM] Skipping AI answer for room ${room.code} as all humans have answered`);
-      return; // Skip generation as we'll use the immediate generation instead
-    }
-
-    try {
-      // Generate AI answer using both current and previous round answers for context
-      const result = await generateAIAnswerWithContext(room, gamePrompt, {
-        useCurrentRoundAnswersOnly: false,
-        immediateResponse: false,
-      });
-
-      // Handle result or error
-      if (result) {
-        // Store AI answer if still in challenge phase and not already answered
-        if (room.gameState === 'challenge' && !room.currentRoundData.answers[room.aiPlayerId]) {
-          room.currentRoundData.answers[room.aiPlayerId] = {
-            playerId: room.aiPlayerId,
-            answer: result.answer,
-            timeSpent: result.timeTaken,
-          };
-
-          // Mark AI as having answered
-          if (room.currentRoundData.participants[room.aiPlayerId]) {
-            room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
-          }
-
-          // Save AI answer to round history
-          const currentRoundHistory = room.roundsHistory.find(
-            (h) => h.roundNumber === room.currentRound,
-          );
-          if (currentRoundHistory) {
-            currentRoundHistory.answers[room.aiPlayerId] =
-              room.currentRoundData.answers[room.aiPlayerId];
-          }
-        }
-      } else {
-        // Provide default answer in case of error (if not already answered)
-        if (room.gameState === 'challenge' && !room.currentRoundData.answers[room.aiPlayerId]) {
-          room.currentRoundData.answers[room.aiPlayerId] = {
-            playerId: room.aiPlayerId,
-            answer: 'Sorry, I was distracted. What was the question again?',
-            timeSpent: 20000,
-          };
-
-          // Mark AI as having answered
-          if (room.currentRoundData.participants[room.aiPlayerId]) {
-            room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
-          }
-
-          // Save fallback AI answer to round history
-          const currentRoundHistory = room.roundsHistory.find(
-            (h) => h.roundNumber === room.currentRound,
-          );
-          if (currentRoundHistory) {
-            currentRoundHistory.answers[room.aiPlayerId] =
-              room.currentRoundData.answers[room.aiPlayerId];
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error generating AI answer:', error);
-
-      // Provide default answer in case of error (if not already answered)
-      if (room.gameState === 'challenge' && !room.currentRoundData.answers[room.aiPlayerId]) {
-        room.currentRoundData.answers[room.aiPlayerId] = {
-          playerId: room.aiPlayerId,
-          answer: 'Sorry, I was distracted. What was the question again?',
-          timeSpent: 20000,
-        };
-
-        // Mark AI as having answered
-        if (room.currentRoundData.participants[room.aiPlayerId]) {
-          room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
-        }
-
-        // Save error fallback AI answer to round history
-        const currentRoundHistory = room.roundsHistory.find(
-          (h) => h.roundNumber === room.currentRound,
-        );
-        if (currentRoundHistory) {
-          currentRoundHistory.answers[room.aiPlayerId] =
-            room.currentRoundData.answers[room.aiPlayerId];
-        }
-      }
-    }
-  })();
-}
+// generateAIAnswer function removed - AI answers are now only generated when all humans have answered
 
 function endChallengePhase(room: Room): void {
   // Don't end if not in challenge phase
