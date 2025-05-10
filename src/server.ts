@@ -669,7 +669,7 @@ io.on('connection', (socket) => {
       const prompts = Object.values(room.playerImposterPrompts);
 
       // Base prompt that ensures concise responses and sets general behavior
-      const basePrompt = `Keep your answer very short (between 2-10 words). 
+      const basePrompt = `Keep your answer short. 
                       Be concise and direct. Remember that humans only 
                       have about 45 seconds to read and answer each question, 
                       so they typically give brief responses.
@@ -1203,7 +1203,6 @@ async function generateAIAnswerWithContext(
     // Calculate average answer length to help the AI match
     const avgAnswerLength =
       totalAnswerCount > 0 ? Math.floor(totalAnswerLength / totalAnswerCount) : 50;
-    const lengthThreshold = totalAnswerCount > 2 ? Math.floor(avgAnswerLength * 0.4) : 30; // 40% variation or default
 
     // Analyze casing style of human answers
     const casingStyleEnum = analyzeCasingFromHumanAnswers(humanAnswers);
@@ -1225,13 +1224,12 @@ async function generateAIAnswerWithContext(
     `;
 
     // Include length guidance based on actual answers
-    answerPrompt += `\nMake your answer around ${avgAnswerLength} characters long (plus or minus ${lengthThreshold} characters). This will help you blend in with the human responses.`;
+    answerPrompt += `\nMake your answer roughly around ${avgAnswerLength} characters long to imitate other humans. This will help you blend in with the human responses.`;
 
     // Include casing style guidance
     answerPrompt += `\nUse ${casingStyle} in your answer to match the style of the average human players.`;
 
     console.log(`[PRE_GEN] average answer length: ${avgAnswerLength}`);
-    console.log(`[PRE_GEN] length threshold: ${lengthThreshold}`);
     console.log(`[PRE_GEN] casing style: ${casingStyle}`);
     console.log(`[PRE_GEN] human answers: ${humanAnswers}`);
     console.log(`[PRE_GEN] total human answers count: ${totalAnswerCount}`);
@@ -1267,6 +1265,7 @@ async function generateAIAnswerWithContext(
     console.log(
       `[LLM_CALL] AI Player Answer Generator - room ${room.code} - ${immediateResponse ? 'immediate' : 'scheduled'}`,
     );
+    console.log(`[LLM_CALL] AI Player Answer Prompt: ${answerPrompt}`);
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       max_tokens: 1024,
