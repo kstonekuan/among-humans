@@ -1832,6 +1832,20 @@ function endVotingPhase(room: Room): void {
   if (isLastRound) {
     room.roundsCompleted = true;
     resultMessage += ' Final round completed!';
+
+    // Add deception points to final scores on the last round
+    // This ensures votes received across all rounds are added to the total score
+    for (const playerId in room.playerVotesReceived) {
+      // Skip AI player - AI doesn't get deception points
+      if (playerId === room.aiPlayerId) continue;
+
+      // Add 1 point per vote received
+      if (room.players[playerId]) {
+        const votesReceived = room.playerVotesReceived[playerId] || 0;
+        room.players[playerId].score += votesReceived;
+        console.log(`[SCORE] Adding ${votesReceived} deception points to player ${playerId}`);
+      }
+    }
   }
 
   // Reset game state
