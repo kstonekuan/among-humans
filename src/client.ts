@@ -93,7 +93,7 @@ let socket: Socket;
 let myPlayerId = '';
 let myRoomCode = ''; // Will store the current room code
 let roundEndTime = 0;
-let timerInterval: number | null = null;
+// Timer variables removed
 let playerVotesReceived: Record<string, number> = {}; // Track votes received by each player
 const currentPlayers: Record<string, Player> = {}; // Store current players to look up player IDs
 
@@ -341,78 +341,14 @@ document.addEventListener('DOMContentLoaded', () => {
    * @param message Status message to show
    */
   function startTimer(duration: number, message: string): void {
-    // Update status message
+    // Update status message only, no timer display
     const statusMessage = document.getElementById('status-message');
     if (statusMessage) {
       statusMessage.textContent = message;
     }
 
-    // Set up and display timer
-    const timerDisplay = document.getElementById('timer-display');
-    if (timerDisplay) {
-      timerDisplay.classList.remove('hidden');
-      // Reset to normal state
-      timerDisplay.classList.remove('timer-warning', 'timer-danger');
-      timerDisplay.classList.add('timer-normal');
-    }
-
-    // Set timer end time
+    // Keep track of when the round would end (for calculating timeSpent)
     roundEndTime = Date.now() + duration;
-
-    // Clear any existing interval
-    if (timerInterval) {
-      clearInterval(timerInterval);
-    }
-
-    // Start new timer interval
-    timerInterval = setInterval(updateTimerDisplay, 1000) as unknown as number;
-    updateTimerDisplay(); // Call immediately to show timer
-
-    // Also set a hard timeout as a failsafe to ensure answers are submitted
-    if (roundEndTime > 0) {
-      // Set a direct timeout that will trigger submission when time is up
-      // This is a failsafe in addition to the interval-based timer
-      const timeoutDuration = roundEndTime - Date.now();
-      console.log(`Setting direct timer expiration in ${timeoutDuration}ms`);
-
-      // Create a timeout that fires exactly when the timer expires
-      setTimeout(() => {
-        console.log('Direct timer expiration triggered');
-        const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
-
-        // Check if we're in the answer phase (input is visible and not disabled)
-        if (answerInput && !answerInput.classList.contains('hidden') && !answerInput.disabled) {
-          console.log('Auto-submitting answer from direct timeout');
-          console.log(`Answer content: "${answerInput.value}"`); // Log the actual content
-          console.log(`Answer length: ${answerInput.value.length}`); // Log the length to check for whitespace
-
-          // Check for whitespace-only content and replace with placeholder text
-          const answerContent = answerInput.value;
-
-          // Directly submit whatever is currently in the input box without trimming
-          // This ensures half-written answers are submitted as-is
-          socket.emit('submit_answer', {
-            answer: answerContent, // Use our adjusted content
-            timeSpent: 0, // Time's up
-          });
-
-          // Disable input
-          answerInput.disabled = true;
-
-          // Hide submit button if it exists
-          const submitButton = document.getElementById('submit-answer-button') as HTMLButtonElement;
-          if (submitButton) {
-            submitButton.classList.add('hidden');
-          }
-
-          // Update status
-          const statusMessage = document.getElementById('status-message');
-          if (statusMessage) {
-            statusMessage.textContent = "Time's up! Your answer has been submitted.";
-          }
-        }
-      }, timeoutDuration);
-    }
   }
 
   // Handle start challenge event
@@ -510,17 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle public answers event
   socket.on('show_public_answers', (publicAnswers: PublicAnswer[]) => {
-    // Hide timer display
-    const timerDisplay = document.getElementById('timer-display');
-    if (timerDisplay) {
-      timerDisplay.classList.add('hidden');
-    }
-
-    // Clear timer interval if active
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
+    // Timer display code removed
 
     const statusMessage = document.getElementById('status-message');
     if (statusMessage) {
@@ -669,17 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle vote results event
   socket.on('show_vote_results', (data: VoteResults) => {
-    // Ensure timer display is hidden
-    const timerDisplay = document.getElementById('timer-display');
-    if (timerDisplay) {
-      timerDisplay.classList.add('hidden');
-    }
-
-    // Make sure timer interval is cleared
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
+    // Timer code removed
 
     // Extract relevant data
     const {
@@ -1086,73 +1002,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Handle answer duration set event
-  socket.on('answer_duration_set', (seconds: number) => {
-    // Update the input value to show the set time
-    const answerTimerInput = document.getElementById('answer-timer') as HTMLInputElement;
-    if (answerTimerInput) {
-      answerTimerInput.value = seconds.toString();
-      answerTimerInput.disabled = true;
-    }
-
-    // Disable the set button
-    const setAnswerTimerButton = document.getElementById('set-answer-timer') as HTMLButtonElement;
-    if (setAnswerTimerButton) {
-      setAnswerTimerButton.disabled = true;
-      setAnswerTimerButton.classList.add('opacity-50');
-      setAnswerTimerButton.textContent = 'Set ✓';
-    }
-
-    // Add a note to indicate that the timer was set
-    const timerNote = document.createElement('div');
-    timerNote.className = 'text-sm text-green-600 mt-1';
-    timerNote.textContent = `Answer time set to ${seconds} seconds.`;
-
-    // Find the timer container and add the note
-    const answerTimerContainer = answerTimerInput?.closest('div')?.parentElement;
-    if (answerTimerContainer) {
-      // Remove any existing notes
-      const existingNote = answerTimerContainer.querySelector('.text-green-600');
-      if (existingNote) {
-        existingNote.remove();
-      }
-      answerTimerContainer.appendChild(timerNote);
-    }
-  });
-
-  // Handle voting duration set event
-  socket.on('voting_duration_set', (seconds: number) => {
-    // Update the input value to show the set time
-    const votingTimerInput = document.getElementById('voting-timer') as HTMLInputElement;
-    if (votingTimerInput) {
-      votingTimerInput.value = seconds.toString();
-      votingTimerInput.disabled = true;
-    }
-
-    // Disable the set button
-    const setVotingTimerButton = document.getElementById('set-voting-timer') as HTMLButtonElement;
-    if (setVotingTimerButton) {
-      setVotingTimerButton.disabled = true;
-      setVotingTimerButton.classList.add('opacity-50');
-      setVotingTimerButton.textContent = 'Set ✓';
-    }
-
-    // Add a note to indicate that the timer was set
-    const timerNote = document.createElement('div');
-    timerNote.className = 'text-sm text-green-600 mt-1';
-    timerNote.textContent = `Voting time set to ${seconds} seconds.`;
-
-    // Find the timer container and add the note
-    const votingTimerContainer = votingTimerInput?.closest('div')?.parentElement;
-    if (votingTimerContainer) {
-      // Remove any existing notes
-      const existingNote = votingTimerContainer.querySelector('.text-green-600');
-      if (existingNote) {
-        existingNote.remove();
-      }
-      votingTimerContainer.appendChild(timerNote);
-    }
-  });
+  // Timer setting events removed
 
   // Handle loading indicator for all players when any player starts the game
   socket.on('loading_game', () => {
@@ -1967,131 +1817,10 @@ function setupEventListeners(): void {
     });
   }
 
-  // Set answer timer button click handler
-  const setAnswerTimerButton = document.getElementById('set-answer-timer');
-  const answerTimerInput = document.getElementById('answer-timer') as HTMLInputElement;
-
-  if (setAnswerTimerButton && answerTimerInput) {
-    setAnswerTimerButton.addEventListener('click', () => {
-      const seconds = Number.parseInt(answerTimerInput.value, 10);
-      if (seconds >= 10 && seconds <= 120) {
-        socket.emit('set_answer_duration', seconds);
-
-        // The server will emit 'answer_duration_set' event to all players
-        // The button will be disabled by the event handler, not here
-      }
-    });
-  }
-
-  // Set voting timer button click handler
-  const setVotingTimerButton = document.getElementById('set-voting-timer');
-  const votingTimerInput = document.getElementById('voting-timer') as HTMLInputElement;
-
-  if (setVotingTimerButton && votingTimerInput) {
-    setVotingTimerButton.addEventListener('click', () => {
-      const seconds = Number.parseInt(votingTimerInput.value, 10);
-      if (seconds >= 10 && seconds <= 60) {
-        socket.emit('set_voting_duration', seconds);
-
-        // The server will emit 'voting_duration_set' event to all players
-        // The button will be disabled by the event handler, not here
-      }
-    });
-  }
+  // Timer setting event handlers removed
 }
 
-// Update timer display
-function updateTimerDisplay(): void {
-  const timerDisplay = document.getElementById('timer-display');
-  if (!timerDisplay) return;
-
-  const remainingTime = Math.max(0, roundEndTime - Date.now());
-  const seconds = Math.ceil(remainingTime / 1000);
-
-  // Visual feedback based on remaining time
-  if (seconds <= 5) {
-    timerDisplay.classList.remove('timer-normal', 'timer-warning');
-    timerDisplay.classList.add('timer-danger');
-  } else if (seconds <= 10) {
-    timerDisplay.classList.remove('timer-normal', 'timer-danger');
-    timerDisplay.classList.add('timer-warning');
-  } else {
-    timerDisplay.classList.remove('timer-warning', 'timer-danger');
-    timerDisplay.classList.add('timer-normal');
-  }
-
-  timerDisplay.textContent = `Time remaining: ${seconds} seconds`;
-
-  // Handle timer expiration
-  if (remainingTime <= 0) {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-
-    // Determine which phase we're in by checking elements
-    const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
-    const submitButton = document.getElementById('submit-answer-button') as HTMLButtonElement;
-    // votingArea is intentionally unused here as we only need to check for voting-hint
-
-    // Handle challenge phase expiration
-    if (answerInput && !answerInput.classList.contains('hidden')) {
-      // Check if the input is not disabled - a disabled input means the answer was already submitted
-      if (!answerInput.disabled) {
-        // Explicitly click the submit button if it exists - now it will work with empty answers
-        if (submitButton && !submitButton.classList.contains('hidden') && !submitButton.disabled) {
-          console.log('Timer expired - clicking submit button');
-          submitButton.click();
-        } else {
-          // Fallback: Submit directly if the button isn't available for some reason
-          console.log('Timer expired - submitting directly from updateTimerDisplay');
-          socket.emit('submit_answer', {
-            answer: answerInput.value, // Don't trim to preserve half-written answers
-            timeSpent: 0, // Time's up
-          });
-
-          // Disable input and hide button
-          answerInput.disabled = true;
-          if (submitButton) {
-            submitButton.classList.add('hidden');
-          }
-
-          // Update status
-          const statusMessage = document.getElementById('status-message');
-          if (statusMessage) {
-            statusMessage.textContent = "Time's up! Your answer has been submitted.";
-          }
-        }
-      }
-    }
-    // Handle voting phase expiration - now we need to check if we're in voting phase
-    else if (document.querySelector('.voting-hint')) {
-      // We're in the voting phase, find all clickable answer cards
-      const answerCards = Array.from(document.querySelectorAll('.answer-card.vote-enabled'));
-
-      // Filter out cards that are the current player (can't vote for yourself)
-      const validCards = answerCards.filter((card) => {
-        const playerName = (card as HTMLElement).dataset.playerName;
-        const playerEntry = Object.entries(currentPlayers).find(
-          ([, player]) => player.name === playerName,
-        );
-        return playerEntry && playerEntry[0] !== myPlayerId;
-      });
-
-      if (validCards.length > 0) {
-        // Pick a random player to vote for
-        const randomIndex = Math.floor(Math.random() * validCards.length);
-        (validCards[randomIndex] as HTMLElement).click();
-
-        // Update status
-        const statusMessage = document.getElementById('status-message');
-        if (statusMessage) {
-          statusMessage.textContent = "Time's up! A random vote has been cast.";
-        }
-      }
-    }
-  }
-}
+// Timer display functionality removed
 
 // Define raw colors directly - bypass Tailwind completely
 const rawColors = [
@@ -2126,12 +1855,10 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     return;
   }
 
-  // Track game state - we're in waiting state if prompt area is empty AND there's no timer display visible
+  // Track game state - we're in waiting state if prompt area is empty
   // This ensures player list appears as soon as a challenge starts
   const promptArea = document.getElementById('prompt-area');
-  const timerDisplay = document.getElementById('timer-display');
-  const isWaiting =
-    !promptArea?.textContent && timerDisplay?.classList.contains('hidden') !== false;
+  const isWaiting = !promptArea?.textContent;
 
   console.log('[RENDER_PLAYER_LIST] Game state - isWaiting:', isWaiting);
 

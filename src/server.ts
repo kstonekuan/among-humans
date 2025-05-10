@@ -27,6 +27,10 @@ if (!OPENAI_API_KEY) {
 const app = express();
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 
+// Default timer durations (in milliseconds)
+const DEFAULT_ANSWER_DURATION = 45000; // 45 seconds for answering
+const DEFAULT_VOTING_DURATION = 20000; // 20 seconds for voting
+
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer);
@@ -89,9 +93,7 @@ type Room = {
   currentRound: number;
   roundsCompleted: boolean;
 
-  // Timer configuration (in milliseconds)
-  answerDuration: number; // Time allowed for answering questions
-  votingDuration: number; // Time allowed for voting
+  // Timer configuration removed
 
   // Track votes across rounds
   allRoundsVotes: Array<{
@@ -517,9 +519,7 @@ io.on('connection', (socket) => {
       currentRound: 0,
       roundsCompleted: false,
 
-      // Initialize timer durations with defaults
-      answerDuration: 45000, // Default 45 seconds for answering
-      votingDuration: 20000, // Default 20 seconds for voting
+      // Timer durations removed
 
       // Initialize empty tracking arrays/objects
       allRoundsVotes: [],
@@ -633,16 +633,7 @@ io.on('connection', (socket) => {
         socket.emit('disable_rounds_input', room.totalRounds);
       }
 
-      // Send current timer settings
-      if (room.answerDuration !== 45000) {
-        // 45 seconds is the default
-        socket.emit('answer_duration_set', room.answerDuration / 1000);
-      }
-
-      if (room.votingDuration !== 20000) {
-        // 20 seconds is the default
-        socket.emit('voting_duration_set', room.votingDuration / 1000);
-      }
+      // Timer settings removed
     }
   });
 
@@ -745,8 +736,8 @@ io.on('connection', (socket) => {
           player.hasVotedThisRound = false;
         }
 
-        // Get configurable answer duration
-        const roundDuration = room.answerDuration;
+        // Use default answer duration
+        const roundDuration = DEFAULT_ANSWER_DURATION;
 
         // Emit start_challenge event to all clients in the room, including round info
         io.to(room.code).emit('start_challenge', {
@@ -827,8 +818,8 @@ io.on('connection', (socket) => {
           player.hasVotedThisRound = false;
         }
 
-        // Get configurable answer duration (fallback case - use a slightly shorter time)
-        const roundDuration = Math.min(room.answerDuration, 30000); // Use room config or 30 seconds max in fallback case
+        // Use default answer duration for fallback case (slightly shorter time)
+        const roundDuration = Math.min(DEFAULT_ANSWER_DURATION, 30000); // Use default config or 30 seconds max in fallback case
 
         // Emit start_challenge event to all clients in the room, including round info
         io.to(room.code).emit('start_challenge', {
@@ -1094,61 +1085,7 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('disable_rounds_input', validatedRoundCount);
   });
 
-  // Handle setting answer timer duration
-  socket.on('set_answer_duration', (duration: number) => {
-    // Find player's room
-    const room = getRoomFromPlayerId(socket.id);
-    if (!room) return;
-
-    // Only allow setting timers in waiting state and before game starts
-    if (room.gameState !== 'waiting' || room.isGameStarted) {
-      socket.emit('status_update', 'Cannot change timers once the game has started');
-      return;
-    }
-
-    // Validate duration (between 10-120 seconds)
-    const durationInMs = Math.min(Math.max(10000, duration * 1000), 120000);
-
-    // Set answer duration
-    room.answerDuration = durationInMs;
-
-    // Log configuration
-    console.log(
-      `[ROOM] Room ${room.code} answer timer set to ${durationInMs / 1000} seconds by player ${socket.id}`,
-    );
-
-    // Notify all room members
-    io.to(room.code).emit('answer_duration_set', durationInMs / 1000);
-    io.to(room.code).emit('status_update', `Answer time set to ${durationInMs / 1000} seconds`);
-  });
-
-  // Handle setting voting timer duration
-  socket.on('set_voting_duration', (duration: number) => {
-    // Find player's room
-    const room = getRoomFromPlayerId(socket.id);
-    if (!room) return;
-
-    // Only allow setting timers in waiting state and before game starts
-    if (room.gameState !== 'waiting' || room.isGameStarted) {
-      socket.emit('status_update', 'Cannot change timers once the game has started');
-      return;
-    }
-
-    // Validate duration (between 10-60 seconds)
-    const durationInMs = Math.min(Math.max(10000, duration * 1000), 60000);
-
-    // Set voting duration
-    room.votingDuration = durationInMs;
-
-    // Log configuration
-    console.log(
-      `[ROOM] Room ${room.code} voting timer set to ${durationInMs / 1000} seconds by player ${socket.id}`,
-    );
-
-    // Notify all room members
-    io.to(room.code).emit('voting_duration_set', durationInMs / 1000);
-    io.to(room.code).emit('status_update', `Voting time set to ${durationInMs / 1000} seconds`);
-  });
+  // Timer configuration event handlers removed
 
   // Handle submitting a question generation prompt
   socket.on('submit_custom_question', (data: { customQuestion: string }) => {
@@ -1630,8 +1567,8 @@ function startVotingPhase(room: Room): void {
     player.hasVotedThisRound = false;
   }
 
-  // Get configurable voting duration
-  const votingDuration = room.votingDuration;
+  // Use default voting duration
+  const votingDuration = DEFAULT_VOTING_DURATION;
 
   // Emit start_voting event to all clients in this room with duration
   io.to(room.code).emit('start_voting', {
