@@ -96,6 +96,112 @@ let roundEndTime = 0;
 let timerInterval: number | null = null;
 let playerVotesReceived: Record<string, number> = {}; // Track votes received by each player
 
+// Track player colors for the current room
+const playerColors: Record<string, string> = {};
+
+// We're no longer using Tailwind colors, but keeping this for reference
+// Commented out to avoid linting errors
+/*
+const availableColors = [
+  'bg-red-500',
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-yellow-500',
+  'bg-purple-500',
+  'bg-cyan-500',
+  'bg-orange-500',
+  'bg-pink-500',
+  'bg-lime-500',
+  'bg-indigo-500',
+  'bg-emerald-500',
+  'bg-violet-500',
+  'bg-amber-500',
+  'bg-teal-500',
+  'bg-rose-500',
+  'bg-fuchsia-500',
+];
+*/
+
+// We're now using direct color values, but keeping this for reference
+// Commented out to avoid linting errors
+/*
+const colorMap: Record<string, string> = {
+  'bg-purple-500': '#8b5cf6',
+  'bg-blue-500': '#3b82f6',
+  'bg-green-500': '#10b981',
+  'bg-yellow-500': '#eab308',
+  'bg-pink-500': '#ec4899',
+  'bg-indigo-500': '#6366f1',
+  'bg-red-500': '#ef4444',
+  'bg-orange-500': '#f97316',
+  'bg-cyan-500': '#06b6d4',
+  'bg-emerald-500': '#10b981',
+  'bg-violet-500': '#8b5cf6',
+  'bg-rose-500': '#f43f5e',
+  'bg-lime-500': '#84cc16',
+  'bg-amber-500': '#f59e0b',
+  'bg-teal-500': '#14b8a6',
+  'bg-fuchsia-500': '#d946ef',
+};
+*/
+
+// Track used colors in the current room to ensure diversity
+const usedColorIndexes: number[] = [];
+
+// Get a deterministic but random-looking color index for a player in the current room
+function getPlayerIndex(playerId: string): number {
+  // If we already assigned a color to this player, return it
+  if (playerColors[playerId]) {
+    // Parse the color hex to its index in the rawColors array
+    const colorHex = playerColors[playerId];
+    const existingIndex = rawColors.indexOf(colorHex);
+    if (existingIndex !== -1) {
+      console.log(
+        `[COLOR_DEBUG] Using existing color ${colorHex} (index ${existingIndex}) for player ${playerId}`,
+      );
+      return existingIndex;
+    }
+  }
+
+  // Calculate a hash from the player ID
+  let hash = 0;
+  for (let i = 0; i < playerId.length; i++) {
+    hash = (hash << 5) - hash + playerId.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+
+  // Get a positive value
+  hash = Math.abs(hash);
+
+  // Find an unused color index if possible
+  if (usedColorIndexes.length < rawColors.length) {
+    // Start at a position determined by the hash
+    const startPosition = hash % rawColors.length;
+
+    // Try each color index in sequence until we find an unused one
+    for (let i = 0; i < rawColors.length; i++) {
+      const tryIndex = (startPosition + i) % rawColors.length;
+      if (!usedColorIndexes.includes(tryIndex)) {
+        usedColorIndexes.push(tryIndex);
+        // Store the assigned color
+        playerColors[playerId] = rawColors[tryIndex];
+        console.log(`[COLOR_DEBUG] Assigned new color index ${tryIndex} to player ${playerId}`);
+        return tryIndex;
+      }
+    }
+  }
+
+  // If all colors are used, fall back to a hash-based assignment
+  const fallbackIndex = hash % rawColors.length;
+  playerColors[playerId] = rawColors[fallbackIndex];
+  console.log(
+    `[COLOR_DEBUG] All colors used, falling back to index ${fallbackIndex} for player ${playerId}`,
+  );
+  return fallbackIndex;
+}
+
+// This function is no longer used since we directly use getPlayerIndex and rawColors in renderPlayerList
+
 // Declare io to avoid TypeScript error
 declare const io: () => Socket;
 
@@ -119,8 +225,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Function to reset color assignments when joining a new room
+  function resetColorAssignments(): void {
+    // Clear the player colors dictionary
+    for (const key of Object.keys(playerColors)) {
+      delete playerColors[key];
+    }
+
+    // Reset the used color indexes array
+    usedColorIndexes.length = 0;
+
+    console.log('[COLOR_DEBUG] Color assignments reset completely');
+  }
+
   // Handle room created event
   socket.on('room_created', (data: RoomData) => {
+    // Reset color assignments for the new room
+    resetColorAssignments();
+
     handleRoomJoined(data);
 
     // Show success message
@@ -132,6 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle room joined event
   socket.on('room_joined', (data: RoomData) => {
+    // Reset color assignments for the new room
+    resetColorAssignments();
+
     handleRoomJoined(data);
 
     // Show success message
@@ -160,7 +285,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle player list updates
   socket.on('update_players', (serverPlayers: Record<string, Player>) => {
+    console.log('[COLOR_DEBUG] update_players event received, rendering player list');
     renderPlayerList(serverPlayers);
+
+    // Check player colors after rendering
+    setTimeout(checkPlayerAvatarColors, 100);
 
     // Update player count if in a room
     if (myRoomCode) {
@@ -1727,10 +1856,38 @@ function updateTimerDisplay(): void {
   }
 }
 
-// Render player list
+// Define raw colors directly - bypass Tailwind completely
+const rawColors = [
+  '#ef4444', // red
+  '#3b82f6', // blue
+  '#10b981', // green
+  '#eab308', // yellow
+  '#8b5cf6', // purple
+  '#06b6d4', // cyan
+  '#f97316', // orange
+  '#ec4899', // pink
+  '#84cc16', // lime
+  '#6366f1', // indigo
+  '#14b8a6', // teal
+  '#f43f5e', // rose
+  '#f59e0b', // amber
+  '#d946ef', // fuchsia
+  '#9333ea', // violet-600
+  '#0891b2', // cyan-600
+];
+
+// Render player list with completely inline styles
 function renderPlayerList(serverPlayers: Record<string, Player>): void {
+  console.log(
+    '[RENDER_PLAYER_LIST] Attempting to render player list with players:',
+    Object.keys(serverPlayers).length,
+  );
+
   const playerList = document.getElementById('player-list');
-  if (!playerList) return;
+  if (!playerList) {
+    console.log('[RENDER_PLAYER_LIST] Player list element not found in DOM');
+    return;
+  }
 
   // Track game state - we're in waiting state if prompt area is empty AND there's no timer display visible
   // This ensures player list appears as soon as a challenge starts
@@ -1738,6 +1895,8 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
   const timerDisplay = document.getElementById('timer-display');
   const isWaiting =
     !promptArea?.textContent && timerDisplay?.classList.contains('hidden') !== false;
+
+  console.log('[RENDER_PLAYER_LIST] Game state - isWaiting:', isWaiting);
 
   // Get player list header elements
   const playerTitle = document.querySelector('#player-list-container h2');
@@ -1793,30 +1952,28 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     const playerItem = document.createElement('div');
     playerItem.className = 'player-list-item';
 
+    // Add style for the player item
+    playerItem.style.padding = '0.75rem';
+    playerItem.style.borderBottom = '1px solid #e5e7eb';
+    playerItem.style.display = 'flex';
+    playerItem.style.justifyContent = 'space-between';
+    playerItem.style.alignItems = 'center';
+
     // Highlight current player
     if (player.id === myPlayerId) {
-      playerItem.classList.add('is-me');
+      playerItem.style.backgroundColor = '#f0f9ff';
+      playerItem.style.fontWeight = '600';
     }
 
     // Get vote count for player (default to 0 if not found)
     const voteCount = playerVotesReceived[player.id] || 0;
 
-    // Generate a random color for player avatar based on player name
-    const hashCode = player.name.split('').reduce((acc, char) => {
-      const newAcc = (acc << 5) - acc + char.charCodeAt(0);
-      return newAcc & newAcc;
-    }, 0);
-    const colors = [
-      'bg-purple-500',
-      'bg-blue-500',
-      'bg-green-500',
-      'bg-yellow-500',
-      'bg-pink-500',
-      'bg-indigo-500',
-      'bg-red-500',
-      'bg-orange-500',
-    ];
-    const colorClass = colors[Math.abs(hashCode) % colors.length];
+    // Get the player index and raw color
+    const playerIndex = getPlayerIndex(player.id);
+    const playerColor = rawColors[playerIndex];
+    console.log(
+      `[COLOR_DEBUG] Player ${player.id} (${player.name}) - index ${playerIndex} - color ${playerColor}`,
+    );
 
     // Get first letter of name for avatar
     const firstLetter = player.name.charAt(0).toUpperCase();
@@ -1845,18 +2002,66 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     // Increment rank counter
     rank++;
 
-    playerItem.innerHTML = `
-      <div class="flex items-center">
-        <div class="player-avatar ${colorClass}">${firstLetter}</div>
-        <span>${rankDisplay}${player.name}${player.id === myPlayerId ? ' <span class="text-blue-600">(you)</span>' : ''}</span>
-      </div>
-      <div class="flex flex-row items-center gap-2">
-        <span class="font-semibold">${player.score}</span>
-        <span class="vote-counter">${voteCount}</span>
-      </div>
-    `;
+    // Create player info container (left side)
+    const playerInfoDiv = document.createElement('div');
+    playerInfoDiv.style.display = 'flex';
+    playerInfoDiv.style.alignItems = 'center';
 
+    // Create avatar with inline styles
+    const avatarDiv = document.createElement('div');
+    avatarDiv.style.width = '2rem';
+    avatarDiv.style.height = '2rem';
+    avatarDiv.style.borderRadius = '9999px';
+    avatarDiv.style.backgroundColor = playerColor;
+    avatarDiv.style.display = 'flex';
+    avatarDiv.style.alignItems = 'center';
+    avatarDiv.style.justifyContent = 'center';
+    avatarDiv.style.color = 'white';
+    avatarDiv.style.fontWeight = '600';
+    avatarDiv.style.marginRight = '0.75rem';
+    avatarDiv.textContent = firstLetter;
+
+    // Add player name span
+    const nameSpan = document.createElement('span');
+    nameSpan.innerHTML = `${rankDisplay}${player.name}${player.id === myPlayerId ? ' <span style="color: #2563eb;">(you)</span>' : ''}`;
+
+    // Create score container (right side)
+    const scoreDiv = document.createElement('div');
+    scoreDiv.style.display = 'flex';
+    scoreDiv.style.flexDirection = 'row';
+    scoreDiv.style.alignItems = 'center';
+    scoreDiv.style.gap = '0.5rem';
+
+    // Score span
+    const scoreSpan = document.createElement('span');
+    scoreSpan.style.fontWeight = '600';
+    scoreSpan.textContent = player.score.toString();
+
+    // Vote counter
+    const voteCounterSpan = document.createElement('span');
+    voteCounterSpan.style.backgroundColor = '#a5b4fc';
+    voteCounterSpan.style.color = 'white';
+    voteCounterSpan.style.borderRadius = '9999px';
+    voteCounterSpan.style.padding = '0.25rem 0.75rem';
+    voteCounterSpan.style.fontSize = '0.875rem';
+    voteCounterSpan.style.fontWeight = '600';
+    voteCounterSpan.textContent = voteCount.toString();
+
+    // Assemble the player item
+    playerInfoDiv.appendChild(avatarDiv);
+    playerInfoDiv.appendChild(nameSpan);
+
+    scoreDiv.appendChild(scoreSpan);
+    scoreDiv.appendChild(voteCounterSpan);
+
+    playerItem.appendChild(playerInfoDiv);
+    playerItem.appendChild(scoreDiv);
+
+    // Add to player list
     playerList.appendChild(playerItem);
+
+    // Log successful creation
+    console.log(`[COLOR_DEBUG] Created avatar for ${player.name} with color ${playerColor}`);
   }
 }
 
@@ -1866,6 +2071,36 @@ function updatePlayerCount(count: number): void {
   if (playerCountElement) {
     playerCountElement.textContent = count.toString();
   }
+}
+
+// We're using direct color values now, so no need for this function
+// function getCssColorFromTailwindClass(tailwindClass: string): string {
+//   // Default color if not found in map
+//   return colorMap[tailwindClass] || '#a5b4fc';
+// }
+
+// Debug function to check if player colors are actually being applied
+function checkPlayerAvatarColors(): void {
+  console.log('[COLOR_CHECK] Checking player avatars in DOM');
+  // In our new implementation, we don't use .player-avatar class anymore
+  // This is now just for debugging legacy elements
+  const avatarDivs = Array.from(document.querySelectorAll('[style*="background-color"]')).filter(
+    (el) =>
+      el instanceof HTMLElement &&
+      el.style.width === '2rem' &&
+      el.style.height === '2rem' &&
+      el.style.borderRadius === '9999px',
+  );
+
+  console.log(`[COLOR_CHECK] Found ${avatarDivs.length} player avatars in DOM with inline styles`);
+
+  avatarDivs.forEach((avatar, index) => {
+    if (avatar instanceof HTMLElement) {
+      const color = avatar.style.backgroundColor;
+      const text = avatar.textContent || '';
+      console.log(`[COLOR_CHECK] Avatar ${index + 1} has color: ${color}, text: ${text}`);
+    }
+  });
 }
 
 // Cast vote
