@@ -1159,19 +1159,16 @@ async function generateAIAnswerWithContext(
     let totalAnswerLength = 0;
     let totalAnswerCount = 0;
 
-    // If using only current round answers (immediate/mid-round generation)
-    if (useCurrentRoundAnswersOnly) {
-      // Process current round answers only
-      for (const playerId in room.currentRoundData.answers) {
-        if (playerId !== room.aiPlayerId) {
-          const answer = room.currentRoundData.answers[playerId].answer;
-          humanAnswers.push(answer);
-          totalAnswerLength += answer.length;
-          totalAnswerCount++;
-        }
-      }
-    } else {
-      // Otherwise include answers from previous rounds for more context
+    for (const playerId in room.currentRoundData.answers) {
+      if (playerId === room.aiPlayerId) continue;
+
+      const answer = room.currentRoundData.answers[playerId].answer;
+      humanAnswers.push(answer);
+      totalAnswerCount++;
+      totalAnswerLength += answer.length;
+    }
+
+    if (!useCurrentRoundAnswersOnly) {
       const prevHumanAnswers: Record<string, Array<string>> = {};
 
       // Collect from previous rounds
@@ -1200,16 +1197,6 @@ async function generateAIAnswerWithContext(
             }
           }
         }
-      }
-
-      // Also include answers from the current round
-      for (const playerId in room.currentRoundData.answers) {
-        if (playerId === room.aiPlayerId) continue;
-
-        const answer = room.currentRoundData.answers[playerId].answer;
-        humanAnswers.push(answer);
-        totalAnswerCount++;
-        totalAnswerLength += answer.length;
       }
     }
 
@@ -1243,6 +1230,12 @@ async function generateAIAnswerWithContext(
     // Include casing style guidance
     answerPrompt += `\nUse ${casingStyle} in your answer to match the style of the average human players.`;
 
+    console.log(`[PRE_GEN] average answer length: ${avgAnswerLength}`);
+    console.log(`[PRE_GEN] length threshold: ${lengthThreshold}`);
+    console.log(`[PRE_GEN] casing style: ${casingStyle}`);
+    console.log(`[PRE_GEN] human answers: ${humanAnswers}`);
+    console.log(`[PRE_GEN] total human answers count: ${totalAnswerCount}`);
+    console.log(`[PRE_GEN] total human answer length: ${totalAnswerLength}`);
     // Add human answers context (different approach based on mode)
     if (useCurrentRoundAnswersOnly && humanAnswers.length > 0) {
       // For immediate generation, include ALL current answers for perfect mimicry
