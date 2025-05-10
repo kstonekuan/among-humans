@@ -68,7 +68,7 @@ type Room = {
   code: string;
   players: Record<string, Player>;
   gameState: 'waiting' | 'challenge' | 'results' | 'voting';
-  gameStarted: boolean; // Indicates whether the game has been started
+  isGameStarted: boolean;
   currentRoundData: RoundData;
   aiPlayerId: string;
   currentAiPlayerName: string;
@@ -212,7 +212,7 @@ async function generateMultipleQuestions(room: Room): Promise<void> {
         prompt
           .split(/[.,;!?]/)
           .map((topic) => topic.trim())
-          .filter((topic) => topic.length > 0)
+          .filter((topic) => topic.length > 0),
       );
 
       console.log(`[ROOM] Extracted ${topics.length} topics for room ${room.code}`);
@@ -303,7 +303,7 @@ async function generateMultipleQuestions(room: Room): Promise<void> {
     // If we didn't get enough questions, fill in with defaults
     if (generatedQuestions.length < questionsToGenerate) {
       console.log(
-        `[ROOM] Only generated ${generatedQuestions.length}/${questionsToGenerate} questions, adding defaults`
+        `[ROOM] Only generated ${generatedQuestions.length}/${questionsToGenerate} questions, adding defaults`,
       );
 
       // How many more do we need?
@@ -326,7 +326,7 @@ async function generateMultipleQuestions(room: Room): Promise<void> {
     }
 
     console.log(
-      `[ROOM] Generated ${room.generatedQuestions.length} questions for room ${room.code}`
+      `[ROOM] Generated ${room.generatedQuestions.length} questions for room ${room.code}`,
     );
   } catch (error) {
     console.error('Error generating multiple questions:', error);
@@ -367,7 +367,7 @@ async function selectPromptForRound(room: Room): Promise<string> {
     room.usedQuestions.push(unusedQuestion.question);
 
     console.log(
-      `[ROOM] Selected pre-generated question for room ${room.code}: ${unusedQuestion.question}`
+      `[ROOM] Selected pre-generated question for room ${room.code}: ${unusedQuestion.question}`,
     );
 
     if (unusedQuestion.topic) {
@@ -387,7 +387,7 @@ async function selectPromptForRound(room: Room): Promise<string> {
   room.usedQuestions.push(fallbackPrompt);
 
   console.log(
-    `[ROOM] Used fallback question for ${room.code}. Total used: ${room.usedQuestions.length}`
+    `[ROOM] Used fallback question for ${room.code}. Total used: ${room.usedQuestions.length}`,
   );
 
   return fallbackPrompt;
@@ -483,7 +483,7 @@ io.on('connection', (socket) => {
           io.to(room.code).emit('status_update', 'Game ended because a player left');
 
           // Show configuration UI to all remaining players
-          io.to(room.code).emit('show_config_ui', { isFirstGame: !room.gameStarted });
+          io.to(room.code).emit('show_config_ui', { isFirstGame: !room.isGameStarted });
 
           // All remaining players can start the game
           io.to(room.code).emit('enable_start_button');
@@ -508,7 +508,7 @@ io.on('connection', (socket) => {
       code: roomCode,
       players: {},
       gameState: 'waiting',
-      gameStarted: false, // Game hasn't started yet
+      isGameStarted: false,
       currentRoundData: {
         prompt: null,
         answers: {},
@@ -626,7 +626,7 @@ io.on('connection', (socket) => {
 
     // Show configuration UI to the newly joined player
     if (room.gameState === 'waiting') {
-      socket.emit('show_config_ui', { isFirstGame: !room.gameStarted });
+      socket.emit('show_config_ui', { isFirstGame: !room.isGameStarted });
       // All players can start the game
       socket.emit('enable_start_button');
 
@@ -654,7 +654,7 @@ io.on('connection', (socket) => {
     if (room.roundsCompleted) {
       socket.emit(
         'status_update',
-        'All rounds have been completed. Start a new game for more rounds.'
+        'All rounds have been completed. Start a new game for more rounds.',
       );
       return;
     }
@@ -675,7 +675,7 @@ io.on('connection', (socket) => {
 
     // Log round information
     console.log(
-      `[ROOM] Room ${room.code} starting round ${room.currentRound} of ${room.totalRounds}`
+      `[ROOM] Room ${room.code} starting round ${room.currentRound} of ${room.totalRounds}`,
     );
 
     // Combine all player imposter prompts
@@ -697,16 +697,16 @@ io.on('connection', (socket) => {
     room.gameState = 'challenge';
 
     // Check if this is the first round/game start
-    if (!room.gameStarted) {
+    if (!room.isGameStarted) {
       // Only randomize player names at game start
       reassignPlayerNames(room);
 
       // Mark the game as started
-      room.gameStarted = true;
+      room.isGameStarted = true;
 
       // Log that the game has started
       console.log(
-        `[ROOM] Game started in room ${room.code} with ${Object.keys(room.players).length} players`
+        `[ROOM] Game started in room ${room.code} with ${Object.keys(room.players).length} players`,
       );
 
       // Generate all questions upfront for the entire game
@@ -761,12 +761,12 @@ io.on('connection', (socket) => {
         setTimeout(() => {
           // Auto-submit answers for any players who haven't answered yet
           const humanParticipants = Object.values(room.currentRoundData.participants).filter(
-            (p) => !p.isAI
+            (p) => !p.isAI,
           );
           for (const player of humanParticipants) {
             if (!player.hasAnswered && room.gameState === 'challenge') {
               console.log(
-                `[ROOM] Auto-submitting answer for player ${player.id} in room ${room.code} because timer expired`
+                `[ROOM] Auto-submitting answer for player ${player.id} in room ${room.code} because timer expired`,
               );
 
               // Create an empty answer for this player
@@ -830,12 +830,12 @@ io.on('connection', (socket) => {
         setTimeout(() => {
           // Auto-submit answers for any players who haven't answered yet
           const humanParticipants = Object.values(room.currentRoundData.participants).filter(
-            (p) => !p.isAI
+            (p) => !p.isAI,
           );
           for (const player of humanParticipants) {
             if (!player.hasAnswered && room.gameState === 'challenge') {
               console.log(
-                `[ROOM] Auto-submitting answer for player ${player.id} in room ${room.code} because timer expired`
+                `[ROOM] Auto-submitting answer for player ${player.id} in room ${room.code} because timer expired`,
               );
 
               // Create an empty answer for this player
@@ -1000,7 +1000,7 @@ io.on('connection', (socket) => {
         'status_update',
         `${
           room.players[socket.id]?.name || 'A player'
-        } added their influence on how the AI imposter will behave.`
+        } added their influence on how the AI imposter will behave.`,
       );
 
       // Send event to the player who submitted to disable their input
@@ -1015,7 +1015,7 @@ io.on('connection', (socket) => {
     if (!room) return;
 
     // Only allow setting rounds in waiting state and before game starts
-    if (room.gameState !== 'waiting' || room.gameStarted) {
+    if (room.gameState !== 'waiting' || room.isGameStarted) {
       socket.emit('status_update', 'Cannot change rounds once the game has started');
       return;
     }
@@ -1028,7 +1028,7 @@ io.on('connection', (socket) => {
 
     // Log configuration
     console.log(
-      `[ROOM] Room ${room.code} configured for ${validatedRoundCount} rounds by player ${socket.id}`
+      `[ROOM] Room ${room.code} configured for ${validatedRoundCount} rounds by player ${socket.id}`,
     );
 
     // Notify all room members
@@ -1063,7 +1063,7 @@ io.on('connection', (socket) => {
       // Notify all players that a player has suggested question topics
       io.to(room.code).emit(
         'status_update',
-        `${room.players[socket.id]?.name || 'A player'} suggested topics for the game's questions!`
+        `${room.players[socket.id]?.name || 'A player'} suggested topics for the game's questions!`,
       );
 
       // Send event to the player who submitted to disable their input
@@ -1122,7 +1122,7 @@ async function generateAIAnswerWithContext(
   options: {
     useCurrentRoundAnswersOnly?: boolean; // Whether to use only current round answers (for immediate/mid-round generation)
     immediateResponse?: boolean; // Whether this is an immediate response (affects timing)
-  }
+  },
 ): Promise<{ answer: string; timeTaken: number } | null> {
   // Don't generate answer if AI is not active or prompt is null
   if (!room.aiPlayerActive || !gamePrompt) {
@@ -1135,7 +1135,7 @@ async function generateAIAnswerWithContext(
   try {
     // Log generation attempt
     console.log(
-      `[ROOM] Generating AI answer for room ${room.code}${immediateResponse ? ' immediately' : ''}`
+      `[ROOM] Generating AI answer for room ${room.code}${immediateResponse ? ' immediately' : ''}`,
     );
 
     // Collect human answers for context and analysis
@@ -1345,7 +1345,7 @@ async function generateAndSubmitAIAnswer(room: Room, gamePrompt: string | null):
 async function generateAIAnswer(
   room: Room,
   gamePrompt: string | null,
-  _roundDuration: number
+  _roundDuration: number,
 ): Promise<void> {
   // Store the promise for potential cancellation
   room.pendingAIAnswerPromise = (async () => {
@@ -1427,12 +1427,12 @@ function endChallengePhase(room: Room): void {
 
   // First ensure all human participants have an answer entry before proceeding
   const humanParticipants = Object.values(room.currentRoundData.participants).filter(
-    (p) => !p.isAI
+    (p) => !p.isAI,
   );
   for (const player of humanParticipants) {
     if (!room.currentRoundData.answers[player.id]) {
       console.log(
-        `[ROOM] Auto-creating empty answer for player ${player.id} in room ${room.code} in endChallengePhase`
+        `[ROOM] Auto-creating empty answer for player ${player.id} in room ${room.code} in endChallengePhase`,
       );
 
       // Create an empty answer for this player
@@ -1540,7 +1540,7 @@ function determineAndCastAIVote(room: Room): void {
 
   // Get all human players in this room
   const humanPlayers = Object.values(room.currentRoundData.participants).filter(
-    (p) => !p.isAI && p.id !== room.aiPlayerId
+    (p) => !p.isAI && p.id !== room.aiPlayerId,
   );
 
   // If no humans to vote for, return
@@ -1768,7 +1768,7 @@ function endVotingPhase(room: Room): void {
     });
 
     // Reset gameStarted flag to allow name randomization in the next game
-    room.gameStarted = false;
+    room.isGameStarted = false;
   }
 }
 

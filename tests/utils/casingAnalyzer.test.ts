@@ -274,7 +274,7 @@ describe('Casing Detection Functions', () => {
     it('handles empty or undefined answers', () => {
       expect(analyzeCasingFromHumanAnswers([''])).toBe(CasingStyle.SENTENCE_CASE);
       expect(analyzeCasingFromHumanAnswers(['', undefined as unknown as string])).toBe(
-        CasingStyle.SENTENCE_CASE
+        CasingStyle.SENTENCE_CASE,
       );
     });
 

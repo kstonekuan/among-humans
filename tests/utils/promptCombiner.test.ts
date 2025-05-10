@@ -18,7 +18,7 @@ describe('Prompt Combination Functions', () => {
     it('handles multiple prompts by combining them with periods', () => {
       const result = combineImposterPrompts(
         ['use lots of emojis', 'mention food in your answer'],
-        testBasePrompt
+        testBasePrompt,
       );
       expect(result).toContain(testBasePrompt);
       expect(result).toContain('use lots of emojis');
@@ -29,7 +29,7 @@ describe('Prompt Combination Functions', () => {
     it('splits prompts containing multiple instructions with punctuation', () => {
       const result = combineImposterPrompts(
         ['use emojis. mention a pet. reference the weather'],
-        testBasePrompt
+        testBasePrompt,
       );
 
       expect(result).toContain(testBasePrompt);
@@ -41,7 +41,7 @@ describe('Prompt Combination Functions', () => {
     it('removes duplicate instructions', () => {
       const result = combineImposterPrompts(
         ['be funny. use humor', 'be funny. use silly words'],
-        testBasePrompt
+        testBasePrompt,
       );
 
       // Count occurrences of "be funny" in the result

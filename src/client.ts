@@ -332,7 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Start the timer for the challenge phase
       startTimer(data.duration, 'Answer the question before time runs out!');
-    }
+    },
   );
 
   // Handle status update event
@@ -835,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
   socket.on('disable_imposter_prompt', () => {
     const aiImposterPrompt = document.getElementById('ai-imposter-prompt') as HTMLTextAreaElement;
     const submitImposterPromptButton = document.getElementById(
-      'submit-imposter-prompt'
+      'submit-imposter-prompt',
     ) as HTMLButtonElement;
 
     if (aiImposterPrompt && submitImposterPromptButton) {
@@ -864,10 +864,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Handle disabling custom question input after submission
   socket.on('disable_custom_question', () => {
     const customQuestionInput = document.getElementById(
-      'custom-question-input'
+      'custom-question-input',
     ) as HTMLTextAreaElement;
     const submitCustomQuestionButton = document.getElementById(
-      'submit-custom-question'
+      'submit-custom-question',
     ) as HTMLButtonElement;
 
     if (customQuestionInput && submitCustomQuestionButton) {
@@ -1117,7 +1117,7 @@ function setupEventListeners(): void {
   if (submitCustomQuestionButton) {
     submitCustomQuestionButton.addEventListener('click', () => {
       const customQuestionInput = document.getElementById(
-        'custom-question-input'
+        'custom-question-input',
       ) as HTMLTextAreaElement;
 
       if (customQuestionInput?.value.trim()) {
