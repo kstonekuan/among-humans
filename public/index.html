@@ -97,6 +97,35 @@
                             </div>
                         </div>
 
+                        <div id="timer-config-container" class="mt-4">
+                            <h3 class="setting-title">⏱️ Timer Settings</h3>
+                            <p class="text-sm text-gray-700 mb-2">Customize how much time players have to answer and vote.</p>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label for="answer-timer" class="block text-sm text-gray-600 mb-1">Answer time (seconds):</label>
+                                    <div class="flex gap-2">
+                                        <input type="number" id="answer-timer" min="10" max="120" value="45"
+                                            class="input-field w-full">
+                                        <button id="set-answer-timer" class="button button-primary">
+                                            Set
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="voting-timer" class="block text-sm text-gray-600 mb-1">Voting time (seconds):</label>
+                                    <div class="flex gap-2">
+                                        <input type="number" id="voting-timer" min="10" max="60" value="20"
+                                            class="input-field w-full">
+                                        <button id="set-voting-timer" class="button button-primary">
+                                            Set
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- AI Imposter Prompt Section -->
                         <div class="setting-section">
                             <h3 class="setting-title">🤖 Influence the AI Imposter</h3>

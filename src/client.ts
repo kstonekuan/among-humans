@@ -368,20 +368,34 @@ document.addEventListener('DOMContentLoaded', () => {
     timerInterval = setInterval(updateTimerDisplay, 1000) as unknown as number;
     updateTimerDisplay(); // Call immediately to show timer
 
-    // Also set a hard timeout as a fallback to ensure answers are submitted
+    // Also set a hard timeout as a failsafe to ensure answers are submitted
     if (roundEndTime > 0) {
       // Set a direct timeout that will trigger submission when time is up
       // This is a failsafe in addition to the interval-based timer
       const timeoutDuration = roundEndTime - Date.now();
       console.log(`Setting direct timer expiration in ${timeoutDuration}ms`);
+
+      // Create a timeout that fires exactly when the timer expires
       setTimeout(() => {
         console.log('Direct timer expiration triggered');
         const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
+
+        // Check if we're in the answer phase (input is visible and not disabled)
         if (answerInput && !answerInput.classList.contains('hidden') && !answerInput.disabled) {
           console.log('Auto-submitting answer from direct timeout');
-          // Directly submit whatever is in the answer box
+          console.log(`Answer content: "${answerInput.value}"`); // Log the actual content
+          console.log(`Answer length: ${answerInput.value.length}`); // Log the length to check for whitespace
+
+          // Check for whitespace-only content and replace with placeholder text
+          const answerContent =
+            answerInput.value.trim() === ''
+              ? '(Half-written answer auto-submitted)'
+              : answerInput.value;
+
+          // Directly submit whatever is currently in the input box without trimming
+          // This ensures half-written answers are submitted as-is
           socket.emit('submit_answer', {
-            answer: answerInput.value.trim(),
+            answer: answerContent, // Use our adjusted content
             timeSpent: 0, // Time's up
           });
 
@@ -533,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Hide player names during voting phase, show only the answer
         answerCard.innerHTML = `
           <div class="mb-1"><span class="font-semibold answer-player-name" data-player-name="${answer.name}"></span></div>
-          <div>${answer.answer || '<em class="text-gray-400">No answer provided</em>'}</div>
+          <div>${answer.answer || '<em class="text-gray-400">(No answer provided)</em>'}</div>
         `;
 
         // Store the player name as data attribute for later
@@ -1072,6 +1086,74 @@ document.addEventListener('DOMContentLoaded', () => {
           roundsInfo.textContent = `${roundCount} rounds`;
         }
       }
+    }
+  });
+
+  // Handle answer duration set event
+  socket.on('answer_duration_set', (seconds: number) => {
+    // Update the input value to show the set time
+    const answerTimerInput = document.getElementById('answer-timer') as HTMLInputElement;
+    if (answerTimerInput) {
+      answerTimerInput.value = seconds.toString();
+      answerTimerInput.disabled = true;
+    }
+
+    // Disable the set button
+    const setAnswerTimerButton = document.getElementById('set-answer-timer') as HTMLButtonElement;
+    if (setAnswerTimerButton) {
+      setAnswerTimerButton.disabled = true;
+      setAnswerTimerButton.classList.add('opacity-50');
+      setAnswerTimerButton.textContent = 'Set ✓';
+    }
+
+    // Add a note to indicate that the timer was set
+    const timerNote = document.createElement('div');
+    timerNote.className = 'text-sm text-green-600 mt-1';
+    timerNote.textContent = `Answer time set to ${seconds} seconds.`;
+
+    // Find the timer container and add the note
+    const answerTimerContainer = answerTimerInput?.closest('div')?.parentElement;
+    if (answerTimerContainer) {
+      // Remove any existing notes
+      const existingNote = answerTimerContainer.querySelector('.text-green-600');
+      if (existingNote) {
+        existingNote.remove();
+      }
+      answerTimerContainer.appendChild(timerNote);
+    }
+  });
+
+  // Handle voting duration set event
+  socket.on('voting_duration_set', (seconds: number) => {
+    // Update the input value to show the set time
+    const votingTimerInput = document.getElementById('voting-timer') as HTMLInputElement;
+    if (votingTimerInput) {
+      votingTimerInput.value = seconds.toString();
+      votingTimerInput.disabled = true;
+    }
+
+    // Disable the set button
+    const setVotingTimerButton = document.getElementById('set-voting-timer') as HTMLButtonElement;
+    if (setVotingTimerButton) {
+      setVotingTimerButton.disabled = true;
+      setVotingTimerButton.classList.add('opacity-50');
+      setVotingTimerButton.textContent = 'Set ✓';
+    }
+
+    // Add a note to indicate that the timer was set
+    const timerNote = document.createElement('div');
+    timerNote.className = 'text-sm text-green-600 mt-1';
+    timerNote.textContent = `Voting time set to ${seconds} seconds.`;
+
+    // Find the timer container and add the note
+    const votingTimerContainer = votingTimerInput?.closest('div')?.parentElement;
+    if (votingTimerContainer) {
+      // Remove any existing notes
+      const existingNote = votingTimerContainer.querySelector('.text-green-600');
+      if (existingNote) {
+        existingNote.remove();
+      }
+      votingTimerContainer.appendChild(timerNote);
     }
   });
 
@@ -1864,7 +1946,7 @@ function setupEventListeners(): void {
   if (submitAnswerButton) {
     submitAnswerButton.addEventListener('click', () => {
       const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
-      const answer = answerInput.value.trim();
+      const answer = answerInput.value; // Don't trim to preserve partial answers
 
       // Always submit the answer, even if empty
       // Calculate time spent (from start until now)
@@ -1884,6 +1966,38 @@ function setupEventListeners(): void {
       const statusMessage = document.getElementById('status-message');
       if (statusMessage) {
         statusMessage.textContent = 'Answer submitted! Waiting for others...';
+      }
+    });
+  }
+
+  // Set answer timer button click handler
+  const setAnswerTimerButton = document.getElementById('set-answer-timer');
+  const answerTimerInput = document.getElementById('answer-timer') as HTMLInputElement;
+
+  if (setAnswerTimerButton && answerTimerInput) {
+    setAnswerTimerButton.addEventListener('click', () => {
+      const seconds = Number.parseInt(answerTimerInput.value, 10);
+      if (seconds >= 10 && seconds <= 120) {
+        socket.emit('set_answer_duration', seconds);
+
+        // The server will emit 'answer_duration_set' event to all players
+        // The button will be disabled by the event handler, not here
+      }
+    });
+  }
+
+  // Set voting timer button click handler
+  const setVotingTimerButton = document.getElementById('set-voting-timer');
+  const votingTimerInput = document.getElementById('voting-timer') as HTMLInputElement;
+
+  if (setVotingTimerButton && votingTimerInput) {
+    setVotingTimerButton.addEventListener('click', () => {
+      const seconds = Number.parseInt(votingTimerInput.value, 10);
+      if (seconds >= 10 && seconds <= 60) {
+        socket.emit('set_voting_duration', seconds);
+
+        // The server will emit 'voting_duration_set' event to all players
+        // The button will be disabled by the event handler, not here
       }
     });
   }
@@ -1933,9 +2047,9 @@ function updateTimerDisplay(): void {
           submitButton.click();
         } else {
           // Fallback: Submit directly if the button isn't available for some reason
-          console.log('Timer expired - submitting directly');
+          console.log('Timer expired - submitting directly from updateTimerDisplay');
           socket.emit('submit_answer', {
-            answer: answerInput.value.trim(), // Submit whatever is in the box
+            answer: answerInput.value, // Don't trim to preserve half-written answers
             timeSpent: 0, // Time's up
           });
 

@@ -89,6 +89,10 @@ type Room = {
   currentRound: number;
   roundsCompleted: boolean;
 
+  // Timer configuration (in milliseconds)
+  answerDuration: number; // Time allowed for answering questions
+  votingDuration: number; // Time allowed for voting
+
   // Track votes across rounds
   allRoundsVotes: Array<{
     roundNumber: number;
@@ -513,6 +517,10 @@ io.on('connection', (socket) => {
       currentRound: 0,
       roundsCompleted: false,
 
+      // Initialize timer durations with defaults
+      answerDuration: 45000, // Default 45 seconds for answering
+      votingDuration: 20000, // Default 20 seconds for voting
+
       // Initialize empty tracking arrays/objects
       allRoundsVotes: [],
       roundsHistory: [], // Initialize empty array to track round history
@@ -624,6 +632,17 @@ io.on('connection', (socket) => {
         socket.emit('rounds_set', room.totalRounds);
         socket.emit('disable_rounds_input', room.totalRounds);
       }
+
+      // Send current timer settings
+      if (room.answerDuration !== 45000) {
+        // 45 seconds is the default
+        socket.emit('answer_duration_set', room.answerDuration / 1000);
+      }
+
+      if (room.votingDuration !== 20000) {
+        // 20 seconds is the default
+        socket.emit('voting_duration_set', room.votingDuration / 1000);
+      }
     }
   });
 
@@ -726,8 +745,8 @@ io.on('connection', (socket) => {
           player.hasVotedThisRound = false;
         }
 
-        // Define round duration (in milliseconds)
-        const roundDuration = 45000; // 45 seconds
+        // Get configurable answer duration
+        const roundDuration = room.answerDuration;
 
         // Emit start_challenge event to all clients in the room, including round info
         io.to(room.code).emit('start_challenge', {
@@ -763,10 +782,12 @@ io.on('connection', (socket) => {
                 `[ROOM] Auto-submitting answer for player ${player.id} in room ${room.code} because timer expired`,
               );
 
-              // Create an empty answer for this player
+              // For auto-submission, we need to get the client's current input value
+              // The client will handle this part by sending whatever is in the input field
+              // Here we just ensure we have an empty entry that the client can fill
               room.currentRoundData.answers[player.id] = {
                 playerId: player.id,
-                answer: '', // Empty answer
+                answer: '', // Empty answer - client will handle sending partial content
                 timeSpent: 0, // Time's up
               };
 
@@ -778,8 +799,11 @@ io.on('connection', (socket) => {
             }
           }
 
-          // End the challenge phase
-          endChallengePhase(room);
+          // Add a short delay before ending the challenge phase
+          // This allows time for any client-side auto-submissions to arrive
+          setTimeout(() => {
+            endChallengePhase(room);
+          }, 500); // 500ms delay to collect all partial answers
         }, roundDuration);
       })
       .catch((error) => {
@@ -803,8 +827,8 @@ io.on('connection', (socket) => {
           player.hasVotedThisRound = false;
         }
 
-        // Define round duration (in milliseconds)
-        const roundDuration = 30000; // 30 seconds
+        // Get configurable answer duration (fallback case - use a slightly shorter time)
+        const roundDuration = Math.min(room.answerDuration, 30000); // Use room config or 30 seconds max in fallback case
 
         // Emit start_challenge event to all clients in the room, including round info
         io.to(room.code).emit('start_challenge', {
@@ -832,10 +856,12 @@ io.on('connection', (socket) => {
                 `[ROOM] Auto-submitting answer for player ${player.id} in room ${room.code} because timer expired`,
               );
 
-              // Create an empty answer for this player
+              // For auto-submission, we need to get the client's current input value
+              // The client will handle this part by sending whatever is in the input field
+              // Here we just ensure we have an empty entry that the client can fill
               room.currentRoundData.answers[player.id] = {
                 playerId: player.id,
-                answer: '', // Empty answer
+                answer: '', // Empty answer - client will handle sending partial content
                 timeSpent: 0, // Time's up
               };
 
@@ -847,8 +873,11 @@ io.on('connection', (socket) => {
             }
           }
 
-          // End the challenge phase
-          endChallengePhase(room);
+          // Add a short delay before ending the challenge phase
+          // This allows time for any client-side auto-submissions to arrive
+          setTimeout(() => {
+            endChallengePhase(room);
+          }, 500); // 500ms delay to collect all partial answers
         }, roundDuration);
       });
   });
@@ -943,8 +972,11 @@ io.on('connection', (socket) => {
               room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
             }
 
-            // End the challenge phase
-            endChallengePhase(room);
+            // Add a short delay before ending the challenge phase
+            // This allows time for any client-side auto-submissions to arrive
+            setTimeout(() => {
+              endChallengePhase(room);
+            }, 500); // 500ms delay to collect all partial answers
           }
         });
     }
@@ -1060,6 +1092,62 @@ io.on('connection', (socket) => {
 
     // Send event to disable rounds input for all players
     io.to(room.code).emit('disable_rounds_input', validatedRoundCount);
+  });
+
+  // Handle setting answer timer duration
+  socket.on('set_answer_duration', (duration: number) => {
+    // Find player's room
+    const room = getRoomFromPlayerId(socket.id);
+    if (!room) return;
+
+    // Only allow setting timers in waiting state and before game starts
+    if (room.gameState !== 'waiting' || room.isGameStarted) {
+      socket.emit('status_update', 'Cannot change timers once the game has started');
+      return;
+    }
+
+    // Validate duration (between 10-120 seconds)
+    const durationInMs = Math.min(Math.max(10000, duration * 1000), 120000);
+
+    // Set answer duration
+    room.answerDuration = durationInMs;
+
+    // Log configuration
+    console.log(
+      `[ROOM] Room ${room.code} answer timer set to ${durationInMs / 1000} seconds by player ${socket.id}`,
+    );
+
+    // Notify all room members
+    io.to(room.code).emit('answer_duration_set', durationInMs / 1000);
+    io.to(room.code).emit('status_update', `Answer time set to ${durationInMs / 1000} seconds`);
+  });
+
+  // Handle setting voting timer duration
+  socket.on('set_voting_duration', (duration: number) => {
+    // Find player's room
+    const room = getRoomFromPlayerId(socket.id);
+    if (!room) return;
+
+    // Only allow setting timers in waiting state and before game starts
+    if (room.gameState !== 'waiting' || room.isGameStarted) {
+      socket.emit('status_update', 'Cannot change timers once the game has started');
+      return;
+    }
+
+    // Validate duration (between 10-60 seconds)
+    const durationInMs = Math.min(Math.max(10000, duration * 1000), 60000);
+
+    // Set voting duration
+    room.votingDuration = durationInMs;
+
+    // Log configuration
+    console.log(
+      `[ROOM] Room ${room.code} voting timer set to ${durationInMs / 1000} seconds by player ${socket.id}`,
+    );
+
+    // Notify all room members
+    io.to(room.code).emit('voting_duration_set', durationInMs / 1000);
+    io.to(room.code).emit('status_update', `Voting time set to ${durationInMs / 1000} seconds`);
   });
 
   // Handle submitting a question generation prompt
@@ -1265,7 +1353,6 @@ async function generateAIAnswerWithContext(
     console.log(
       `[LLM_CALL] AI Player Answer Generator - room ${room.code} - ${immediateResponse ? 'immediate' : 'scheduled'}`,
     );
-    console.log(`[LLM_CALL] AI Player Answer Prompt: ${answerPrompt}`);
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       max_tokens: 1024,
@@ -1464,13 +1551,14 @@ function endChallengePhase(room: Room): void {
   for (const player of humanParticipants) {
     if (!room.currentRoundData.answers[player.id]) {
       console.log(
-        `[ROOM] Auto-creating empty answer for player ${player.id} in room ${room.code} in endChallengePhase`,
+        `[ROOM] Auto-creating placeholder answer for player ${player.id} in room ${room.code} in endChallengePhase`,
       );
 
-      // Create an empty answer for this player
+      // For the endChallengePhase case, we need to handle players who never submitted answers
+      // Create a placeholder entry that will show their current input (or empty if none)
       room.currentRoundData.answers[player.id] = {
         playerId: player.id,
-        answer: '', // Empty answer
+        answer: '', // Empty answer - client might have partial content
         timeSpent: 0, // Time's up
       };
 
@@ -1542,8 +1630,8 @@ function startVotingPhase(room: Room): void {
     player.hasVotedThisRound = false;
   }
 
-  // Define voting duration (in milliseconds)
-  const votingDuration = 20000; // 20 seconds
+  // Get configurable voting duration
+  const votingDuration = room.votingDuration;
 
   // Emit start_voting event to all clients in this room with duration
   io.to(room.code).emit('start_voting', {
