@@ -95,6 +95,13 @@ type Room = {
     votes: Record<string, string>; // voterId -> votedForId
   }>;
 
+  // Track round history (for showing in final results)
+  roundsHistory: Array<{
+    roundNumber: number;
+    prompt: string;
+    answers: Record<string, Answer>; // playerId -> answer
+  }>;
+
   // Track votes received per player
   playerVotesReceived: Record<string, number>; // playerId -> number of votes received
 
@@ -508,6 +515,7 @@ io.on('connection', (socket) => {
 
       // Initialize empty tracking arrays/objects
       allRoundsVotes: [],
+      roundsHistory: [], // Initialize empty array to track round history
       playerVotesReceived: {},
       playerAIDetectionSuccess: {},
     };
@@ -730,6 +738,14 @@ io.on('connection', (socket) => {
         // Send event to hide start button and AI prompt input for all players
         io.to(room.code).emit('hide_game_controls');
 
+        // Save this round's data to history
+        const historyEntry = {
+          roundNumber: room.currentRound,
+          prompt: room.currentRoundData.prompt,
+          answers: {}, // Will be filled with answers as they come in
+        };
+        room.roundsHistory.push(historyEntry);
+
         // Trigger AI answer generation
         generateAIAnswer(room, room.currentRoundData.prompt, roundDuration);
 
@@ -851,11 +867,20 @@ io.on('connection', (socket) => {
     }
 
     // Store human answer
-    room.currentRoundData.answers[socket.id] = {
+    const answerData = {
       playerId: socket.id,
       answer: data.answer,
       timeSpent: data.timeSpent,
     };
+
+    // Store in current round data
+    room.currentRoundData.answers[socket.id] = answerData;
+
+    // Also store in round history
+    const currentRoundHistory = room.roundsHistory.find((h) => h.roundNumber === room.currentRound);
+    if (currentRoundHistory) {
+      currentRoundHistory.answers[socket.id] = answerData;
+    }
 
     // Mark player as having answered
     if (room.currentRoundData.participants[socket.id]) {
@@ -878,6 +903,15 @@ io.on('connection', (socket) => {
       // Generate and immediately submit AI answer now that we have all human answers
       generateAndSubmitAIAnswer(room, room.currentRoundData.prompt)
         .then(() => {
+          // Save AI answer to history as well
+          const currentRoundHistory = room.roundsHistory.find(
+            (h) => h.roundNumber === room.currentRound,
+          );
+          if (currentRoundHistory && room.currentRoundData.answers[room.aiPlayerId]) {
+            currentRoundHistory.answers[room.aiPlayerId] =
+              room.currentRoundData.answers[room.aiPlayerId];
+          }
+
           // End challenge phase once AI has answered
           endChallengePhase(room);
         })
@@ -885,11 +919,22 @@ io.on('connection', (socket) => {
           console.error('Error generating AI answer after all humans answered:', error);
           // Provide fallback answer
           if (room.gameState === 'challenge') {
-            room.currentRoundData.answers[room.aiPlayerId] = {
+            const fallbackAnswer = {
               playerId: room.aiPlayerId,
               answer: 'Sorry, I was distracted. What was the question again?',
               timeSpent: 1000, // Very short time since we're answering immediately
             };
+
+            // Store in current round data
+            room.currentRoundData.answers[room.aiPlayerId] = fallbackAnswer;
+
+            // Also store in round history
+            const currentRoundHistory = room.roundsHistory.find(
+              (h) => h.roundNumber === room.currentRound,
+            );
+            if (currentRoundHistory) {
+              currentRoundHistory.answers[room.aiPlayerId] = fallbackAnswer;
+            }
 
             // Mark AI as having answered
             if (room.currentRoundData.participants[room.aiPlayerId]) {
@@ -1351,6 +1396,15 @@ async function generateAIAnswer(
           if (room.currentRoundData.participants[room.aiPlayerId]) {
             room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
           }
+
+          // Save AI answer to round history
+          const currentRoundHistory = room.roundsHistory.find(
+            (h) => h.roundNumber === room.currentRound,
+          );
+          if (currentRoundHistory) {
+            currentRoundHistory.answers[room.aiPlayerId] =
+              room.currentRoundData.answers[room.aiPlayerId];
+          }
         }
       } else {
         // Provide default answer in case of error (if not already answered)
@@ -1364,6 +1418,15 @@ async function generateAIAnswer(
           // Mark AI as having answered
           if (room.currentRoundData.participants[room.aiPlayerId]) {
             room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
+          }
+
+          // Save fallback AI answer to round history
+          const currentRoundHistory = room.roundsHistory.find(
+            (h) => h.roundNumber === room.currentRound,
+          );
+          if (currentRoundHistory) {
+            currentRoundHistory.answers[room.aiPlayerId] =
+              room.currentRoundData.answers[room.aiPlayerId];
           }
         }
       }
@@ -1381,6 +1444,15 @@ async function generateAIAnswer(
         // Mark AI as having answered
         if (room.currentRoundData.participants[room.aiPlayerId]) {
           room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
+        }
+
+        // Save error fallback AI answer to round history
+        const currentRoundHistory = room.roundsHistory.find(
+          (h) => h.roundNumber === room.currentRound,
+        );
+        if (currentRoundHistory) {
+          currentRoundHistory.answers[room.aiPlayerId] =
+            room.currentRoundData.answers[room.aiPlayerId];
         }
       }
     }
@@ -1726,6 +1798,10 @@ function endVotingPhase(room: Room): void {
       // Add individual player imposter and question prompts
       playerImposterPrompts: room.playerImposterPrompts,
       playerQuestionPrompts: room.playerQuestionPrompts,
+      // Add round history with prompts and answers
+      roundsHistory: room.roundsHistory,
+      // Include votes across all rounds
+      allRoundsVotes: room.allRoundsVotes,
     });
 
     // Reset gameStarted flag to allow name randomization in the next game

@@ -66,6 +66,18 @@ interface GameComplete {
     roundNumber: number;
     votes: Record<string, string>;
   }>;
+  roundsHistory?: Array<{
+    roundNumber: number;
+    prompt: string;
+    answers: Record<
+      string,
+      {
+        playerId: string;
+        answer: string;
+        timeSpent: number;
+      }
+    >;
+  }>;
 }
 
 // Define socket type
@@ -976,17 +988,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Function to create the final results page
   function createFinalResultsPage(data: GameComplete): void {
+    // Only destructure what we use directly
     const {
       playerAIDetectionSuccess,
       playerVotesReceived,
       aiPlayer,
       players,
-      questionPromptCount,
       combinedImposterPrompt,
       playerImposterPrompts,
-      playerQuestionPrompts,
-      combinedQuestionPrompt,
     } = data;
+
+    // We access other properties directly from the data object when needed
 
     // Clear existing content in public answers area
     const answersArea = document.getElementById('public-answers-area');
@@ -1230,7 +1242,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const roundsAccordion = document.createElement('div');
       roundsAccordion.className = 'space-y-3';
 
-      sortedRounds.forEach((round) => {
+      // Create a map of round number to history data for easy lookup
+      const historyMap = new Map();
+      if (data.roundsHistory && data.roundsHistory.length > 0) {
+        for (const historyItem of data.roundsHistory) {
+          historyMap.set(historyItem.roundNumber, historyItem);
+        }
+      }
+
+      for (const round of sortedRounds) {
         const roundPanel = document.createElement('div');
         roundPanel.className = 'border border-gray-200 rounded-lg overflow-hidden';
 
@@ -1248,12 +1268,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const roundContent = document.createElement('div');
         roundContent.className = 'hidden p-4 bg-white';
 
+        // Get round history data if available
+        const historyItem = historyMap.get(round.roundNumber);
+
         // Try to get the prompt for this round
-        // In the current implementation, we don't have all prompts from previous rounds
         let roundPrompt = 'Question not available';
 
-        // If this is the last round and we have currentPrompt available, use it
-        if (data.currentPrompt && round.roundNumber === sortedRounds.length) {
+        // First try to get prompt from history
+        if (historyItem?.prompt) {
+          roundPrompt = historyItem.prompt;
+        }
+        // Fall back to current prompt for last round
+        else if (data.currentPrompt && round.roundNumber === sortedRounds.length) {
           roundPrompt = data.currentPrompt;
         }
 
@@ -1271,9 +1297,63 @@ document.addEventListener('DOMContentLoaded', () => {
         answersDiv.className = 'mb-4';
         answersDiv.innerHTML = `<h4 class="font-semibold mb-2">Answers:</h4>`;
 
-        // We would need to store answers history to show them here
-        // This would require server-side changes to store all rounds' answers
-        answersDiv.innerHTML += `<p class="text-sm text-gray-500">(Answers not available in history)</p>`;
+        // Add answers from round history if available
+        if (historyItem?.answers && Object.keys(historyItem.answers).length > 0) {
+          const answersList = document.createElement('div');
+          answersList.className = 'space-y-2';
+
+          // We need to explicitly type this to avoid type errors
+          type AnswerType = {
+            playerId: string;
+            answer: string;
+            timeSpent: number;
+          };
+
+          // Sort answers by player name for consistent display
+          const sortedAnswers = Object.values(historyItem.answers)
+            .map((answer) => {
+              const typedAnswer = answer as AnswerType;
+              return {
+                playerName: players[typedAnswer.playerId]?.name || 'Unknown Player',
+                isAI: typedAnswer.playerId === aiPlayer.id,
+                answer: typedAnswer.answer,
+                timeSpent: typedAnswer.timeSpent,
+                playerId: typedAnswer.playerId,
+              };
+            })
+            .sort((a, b) => a.playerName.localeCompare(b.playerName));
+
+          for (const answerData of sortedAnswers) {
+            // Format time spent in seconds
+            const timeSpentSeconds = Math.round(answerData.timeSpent / 1000);
+            const timeDisplay = timeSpentSeconds > 0 ? `${timeSpentSeconds}s` : 'Time expired';
+
+            const answerItem = document.createElement('div');
+            answerItem.className = 'p-2 border border-gray-200 rounded bg-gray-50';
+
+            // Highlight AI answers
+            if (answerData.isAI) {
+              answerItem.classList.add('bg-red-50', 'border-red-200');
+            }
+
+            answerItem.innerHTML = `
+              <div class="flex justify-between mb-1">
+                <span class="font-semibold ${answerData.isAI ? 'text-red-600' : ''}">${answerData.playerName}${answerData.isAI ? ' (AI)' : ''}</span>
+                <span class="text-xs text-gray-500">Time: ${timeDisplay}</span>
+              </div>
+              <div class="text-sm">
+                ${answerData.answer || '<em class="text-gray-400">No answer provided</em>'}
+              </div>
+            `;
+
+            answersList.appendChild(answerItem);
+          }
+
+          answersDiv.appendChild(answersList);
+        } else {
+          // No answers available
+          answersDiv.innerHTML += `<p class="text-sm text-gray-500">(Answers not available in history)</p>`;
+        }
         roundContent.appendChild(answersDiv);
 
         // Add voting results
@@ -1295,7 +1375,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const votesList = document.createElement('ul');
         votesList.className = 'list-disc pl-5 text-sm space-y-1';
 
-        Object.entries(voteCounts).forEach(([votedForId, count]) => {
+        for (const [votedForId, count] of Object.entries(voteCounts)) {
           const playerName = players[votedForId]?.name || 'Unknown';
           const isAI = votedForId === aiPlayer.id;
 
@@ -1305,7 +1385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             received ${count} vote${count !== 1 ? 's' : ''}
           `;
           votesList.appendChild(voteItem);
-        });
+        }
 
         votingDiv.appendChild(votesList);
         roundContent.appendChild(votingDiv);
@@ -1322,7 +1402,7 @@ document.addEventListener('DOMContentLoaded', () => {
             arrow.textContent = isHidden ? '▲' : '▼';
           }
         });
-      });
+      }
 
       roundsHistorySection.appendChild(roundsAccordion);
     } else {
