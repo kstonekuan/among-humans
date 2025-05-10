@@ -387,10 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
           console.log(`Answer length: ${answerInput.value.length}`); // Log the length to check for whitespace
 
           // Check for whitespace-only content and replace with placeholder text
-          const answerContent =
-            answerInput.value.trim() === ''
-              ? '(Half-written answer auto-submitted)'
-              : answerInput.value;
+          const answerContent = answerInput.value;
 
           // Directly submit whatever is currently in the input box without trimming
           // This ensures half-written answers are submitted as-is
