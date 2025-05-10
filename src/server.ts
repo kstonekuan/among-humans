@@ -1209,9 +1209,7 @@ async function generateAIAnswerWithContext(
     // Base imposter behavior - aligned with combineImposterPrompts function's basePrompt
     const baseImposterBehavior = `
     Keep your answer very short (between 2-10 words).
-    Be concise and direct. Remember that humans only have about 45 seconds to read and answer each question.
-    Try to write like it's a text message (minimal capitalization and punctuation).
-    `;
+    Be concise and direct. Remember that humans only have about 45 seconds to read and answer each question.`;
 
     // Build prompt with current context
     let answerPrompt = `
@@ -1227,7 +1225,7 @@ async function generateAIAnswerWithContext(
     answerPrompt += `\nMake your answer around ${avgAnswerLength} characters long (plus or minus ${lengthThreshold} characters). This will help you blend in with the human responses.`;
 
     // Include casing style guidance
-    answerPrompt += `\nUse ${casingStyle} in your answer to match the style of most human players.`;
+    answerPrompt += `\nUse ${casingStyle} in your answer to match the style of the average human players.`;
 
     // Add human answers context (different approach based on mode)
     if (useCurrentRoundAnswersOnly && humanAnswers.length > 0) {
