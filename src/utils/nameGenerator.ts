@@ -1,6 +1,3 @@
-// Player name utilities for Among Humans game
-
-// List of potential player names - each player gets a random name
 export const playerNames = [
   'Alex',
   'Bailey',

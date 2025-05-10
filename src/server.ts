@@ -9,10 +9,8 @@ import { analyzeCasingFromHumanAnswers, casingStyleToString } from './utils/casi
 import { getRandomPlayerName, playerNames } from './utils/nameGenerator';
 import { combineImposterPrompts } from './utils/promptCombiner';
 
-// Load environment variables
 dotenv.config();
 
-// Initialize LLM client
 let openai: OpenAI;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -26,20 +24,15 @@ if (!OPENAI_API_KEY) {
   console.log('OpenAI API client initialized');
 }
 
-// Initialize Express app
 const app = express();
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 
-// Create HTTP server
 const httpServer = http.createServer(app);
 
-// Initialize Socket.IO
 const io = new Server(httpServer);
 
-// Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Server-side game state
 type Player = {
   id: string;
   name: string;
@@ -48,7 +41,7 @@ type Player = {
   hasAnswered?: boolean;
   hasVotedThisRound?: boolean;
   roomCode?: string;
-  customQuestion?: string; // Player's custom question suggestion
+  customQuestion?: string;
 };
 
 type Answer = {
@@ -109,7 +102,6 @@ type Room = {
   playerAIDetectionSuccess: Record<string, number>; // playerId -> number of correct AI detections
 };
 
-// Generate a random 6-character room code
 function generateRoomCode(): string {
   const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Omitting similar-looking characters
   let code = '';
@@ -119,10 +111,8 @@ function generateRoomCode(): string {
   return code;
 }
 
-// Store all active rooms
 const rooms: Record<string, Room> = {};
 
-// Game prompts
 const gamePrompts = [
   'Describe your perfect Sunday in one sentence',
   'What would you do if you won the lottery?',
@@ -136,7 +126,6 @@ const gamePrompts = [
   'What is the best piece of advice you have ever received?',
 ];
 
-// Fallback function to generate a new prompt when all pre-generated questions are used
 async function generatePromptWithAI(room: Room): Promise<string> {
   try {
     // If no question prompts provided, use a random default prompt
@@ -393,10 +382,6 @@ async function selectPromptForRound(room: Room): Promise<string> {
   return fallbackPrompt;
 }
 
-// Each room has its own usedNames tracking for player name assignment
-
-// Function to get filtered players based on game state
-// During waiting state, don't include the AI player
 function getFilteredPlayersForClient(room: Room): Record<string, Player> {
   // If not in waiting state, send all players in the room
   if (room.gameState !== 'waiting') {
@@ -415,26 +400,18 @@ function getFilteredPlayersForClient(room: Room): Record<string, Player> {
   return filteredPlayers;
 }
 
-// getRandomPlayerName is now imported from utils/nameGenerator.ts
-
-// Reassign new random names to all players for a new round
 function reassignPlayerNames(room: Room): void {
-  // Reset used names list for this room
   const roomUsedNames: string[] = [];
 
-  // Reassign names to all human players in the room
   for (const playerId in room.players) {
-    // Skip the AI player
     if (playerId !== room.aiPlayerId) {
       room.players[playerId].name = getRandomPlayerName(roomUsedNames);
     }
   }
 
-  // Notify clients in the room about player list update
   io.to(room.code).emit('update_players', getFilteredPlayersForClient(room));
 }
 
-// Function to get room from player socket id
 function getRoomFromPlayerId(playerId: string): Room | null {
   // Find the room the player is in
   for (const roomCode in rooms) {
@@ -445,7 +422,6 @@ function getRoomFromPlayerId(playerId: string): Room | null {
   return null;
 }
 
-// Socket.IO connection handler
 io.on('connection', (socket) => {
   console.log(`New connection: ${socket.id}`);
 
@@ -638,8 +614,6 @@ io.on('connection', (socket) => {
       }
     }
   });
-
-  // The 'join_game' event is no longer needed since room selection is shown by default
 
   // Handle request to start a new round
   socket.on('request_start_round', () => {
@@ -1076,9 +1050,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// The AI player will just get a random name from the same pool as human players
-
-// Activate AI player
 function activateAIPlayer(room: Room): void {
   // Don't activate if already active
   if (room.aiPlayerActive) return;
@@ -1112,10 +1083,6 @@ function activateAIPlayer(room: Room): void {
   io.to(room.code).emit('update_players', getFilteredPlayersForClient(room));
 }
 
-/**
- * Shared function to generate an AI answer with current context
- * Used by both immediate answer generation and timed answer generation
- */
 async function generateAIAnswerWithContext(
   room: Room,
   gamePrompt: string | null,
@@ -1302,7 +1269,6 @@ async function generateAIAnswerWithContext(
   }
 }
 
-// Generate and immediately submit AI answer after all humans have answered
 async function generateAndSubmitAIAnswer(room: Room, gamePrompt: string | null): Promise<void> {
   try {
     // Generate AI answer with current round answers for context
@@ -1338,8 +1304,6 @@ async function generateAndSubmitAIAnswer(room: Room, gamePrompt: string | null):
   }
 }
 
-// Scheduled AI answer generation function - used as a backup
-// if players don't all answer before the timer ends
 async function generateAIAnswer(
   room: Room,
   gamePrompt: string | null,
@@ -1418,7 +1382,6 @@ async function generateAIAnswer(
   })();
 }
 
-// End challenge phase
 function endChallengePhase(room: Room): void {
   // Don't end if not in challenge phase
   if (room.gameState !== 'challenge') return;
@@ -1460,7 +1423,6 @@ function endChallengePhase(room: Room): void {
   proceedToShowPublicResults(room, collectedAnswers);
 }
 
-// Define public answer type for client consumption
 type PublicAnswerData = {
   id: string;
   name: string;
@@ -1468,7 +1430,6 @@ type PublicAnswerData = {
   time: number | null;
 };
 
-// Show public results
 function proceedToShowPublicResults(room: Room, answers: PublicAnswerData[]): void {
   // Set game state to results
   room.gameState = 'results';
@@ -1498,7 +1459,6 @@ function proceedToShowPublicResults(room: Room, answers: PublicAnswerData[]): vo
   startVotingPhase(room);
 }
 
-// Start voting phase
 function startVotingPhase(room: Room): void {
   // Set game state to voting
   room.gameState = 'voting';
@@ -1525,7 +1485,6 @@ function startVotingPhase(room: Room): void {
   // We don't need to set a timeout for ending voting phase as it will end when all players vote
 }
 
-// Determine and cast AI vote
 function determineAndCastAIVote(room: Room): void {
   // Validate game state and AI player
   if (
@@ -1598,7 +1557,6 @@ function determineAndCastAIVote(room: Room): void {
   }
 }
 
-// End voting phase
 function endVotingPhase(room: Room): void {
   // Don't end if not in voting phase
   if (room.gameState !== 'voting') return;
@@ -1770,7 +1728,6 @@ function endVotingPhase(room: Room): void {
   }
 }
 
-// Start the server
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

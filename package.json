@@ -13,7 +13,7 @@
     "watch-server": "ts-node-dev --respawn src/server.ts",
     "watch-client": "tsc -p tsconfig.client.json --watch",
     "watch-css": "npx tailwindcss -i ./public/style.css -o ./public/tailwind.css --watch",
-    "lint": "biome check .",
+    "lint": "biome check --write .",
     "lint:watch": "nodemon --watch 'src/**/*' --ext ts,tsx,js,jsx --exec 'npm run lint'",
     "format": "biome format --write .",
     "format:watch": "nodemon --watch 'src/**/*' --ext ts,tsx,js,jsx --exec 'npm run format'",

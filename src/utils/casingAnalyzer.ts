@@ -1,10 +1,3 @@
-/**
- * Casing analysis utilities
- *
- * This file contains functions for analyzing the casing patterns of text,
- * which is used to help the AI mimic human writing patterns.
- */
-
 export enum CasingStyle {
   LOWERCASE = 0,
   UPPERCASE = 1,

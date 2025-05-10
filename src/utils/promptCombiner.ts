@@ -1,10 +1,4 @@
 /**
- * Utility functions for combining prompts
- *
- * These functions were extracted from server.ts to make them testable
- */
-
-/**
  * Helper function to extract unique instructions/topics from prompts
  * @param prompts Array of user-provided prompts
  * @returns Array of unique instructions/topics
