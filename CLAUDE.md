@@ -1,0 +1,9 @@
+- Prefer typescript over javascript
+- Prefer tailwind css (version 4.x)
+- Always run builds and linting after making changes and fix the errors
+- Prefer biome over eslint
+- Make incremental changes instead of huge ones
+- Seek out good opportunities for unit testing and implement them
+- You can run build, lint, and format commands but do not run the server itself
+- Prefer accurate and descriptive function names over writing comments, even if they are verbose
+- Important note about Tailwind CSS 4.x: If styling issues occur, check the generated tailwind.css file for missing classes. Tailwind 4.x requires using the 'safelist' option in tailwind.config.js to include dynamically used classes. The project uses a custom.css file to supplement missing classes.

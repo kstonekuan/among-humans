@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AmongHumans.io</title>
+    <link rel="stylesheet" href="tailwind.css">
+    <link rel="stylesheet" href="custom.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
+</head>
+
+<body>
+    <div class="main-container">
+        <h1 class="game-title">AmongHumans.io</h1>
+
+        <div id="status-message" class="status-message">
+            Create a new room or join an existing one!
+        </div>
+
+        <!-- Room selection area (shown by default) -->
+        <div id="room-selection-area" class="flex flex-col items-center gap-4 mb-6">
+            <h2 class="text-xl font-semibold text-purple-600">Create or Join a Room</h2>
+
+            <div class="flex flex-wrap gap-4 justify-center">
+                <button id="create-room-button" class="button button-success px-6 py-3 text-lg">
+                    Create Room
+                </button>
+
+                <div class="flex flex-col gap-2">
+                    <input id="room-code-input" type="text" placeholder="Enter room code"
+                        class="input-field" maxlength="6">
+                    <button id="join-room-button" class="button button-primary text-lg">
+                        Join Room
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room info area (hidden by default) -->
+        <div id="room-info-area" class="hidden p-3 rounded-lg text-center mb-5 bg-white shadow-md">
+            <div class="flex justify-center items-center gap-4 flex-wrap">
+                <div>
+                    <span class="font-bold text-gray-800">Room Code: </span>
+                    <span id="room-code-display" class="room-code"></span>
+                </div>
+                <div class="player-counter">
+                    <span id="player-count">0</span> <span>players</span>
+                </div>
+                <!-- Rounds info will be dynamically inserted here when rounds are set -->
+            </div>
+            <p class="text-sm text-gray-600 mt-1">Share this code with friends to invite them!</p>
+        </div>
+
+        <!-- Game description (shown by default) -->
+        <div id="game-description" class="card p-5 text-center mb-6">
+            <h2 class="text-xl font-semibold mb-3">How to Play</h2>
+            <p class="mb-3">Among Humans is a social deduction game where one player is secretly an imposter AI.</p>
+            <div class="flex flex-col items-center gap-2">
+
+                <div class="game-step">
+                    <div class="step-number">0</div>
+                    <p>Before the round starts: influence imposter AI's behavior and the type of questions</p>
+                </div>
+                <div class="game-step">
+                    <div class="step-number">1</div>
+                    <p>All players answer the same question</p>
+                </div>
+                <div class="game-step">
+                    <div class="step-number">2</div>
+                    <p>Try to identify which answer was written by the AI</p>
+                </div>
+                <div class="game-step">
+                    <div class="step-number">3</div>
+                    <p>Score points by correctly identifying the AI or by fooling others</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-grid" class="game-grid hidden">
+            <div class="card" id="player-list-container">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-xl font-semibold text-purple-600 mb-3">Players</h2>
+                    <span class="text-sm text-gray-500">Votes Received</span>
+                </div>
+                <div id="player-list" class="mb-5"></div>
+                <div id="start-button-container">
+                    <div id="round-config" class="hidden mb-3">
+                        <div id="rounds-input-container">
+                            <label for="round-count" class="block text-sm text-gray-600 mb-1">Number of rounds:</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="round-count" min="1" max="10" value="3"
+                                    class="input-field w-full">
+                                <button id="set-rounds-button" class="button button-primary">
+                                    Set
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- AI Imposter Prompt Section -->
+                        <div class="setting-section">
+                            <h3 class="setting-title">🤖 Influence the AI Imposter</h3>
+                            <p class="text-sm text-gray-700 mb-2">Tell the AI imposter how to act. Be creative - your instructions will be combined with other players'.</p>
+                            <label for="ai-imposter-prompt" class="block text-sm text-gray-600 mb-1">Make the AI imposter:</label>
+                            <textarea id="ai-imposter-prompt" rows="2"
+                                placeholder="Examples: 'sound like a teenager', 'use lots of emojis', 'pretend to be confused', 'use British slang'"
+                                class="textarea-field w-full mb-2"
+                                style="min-height: 80px; max-width: 100%; box-sizing: border-box;"></textarea>
+                            <button id="submit-imposter-prompt" class="button button-primary w-full mb-2"
+                                style="max-width: 100%;">
+                                Submit Your Influence
+                            </button>
+                            <p class="text-xs text-gray-500 mb-4">Every player can submit one instruction. All instructions will be combined.</p>
+                        </div>
+                        
+                        <!-- Custom Question Input -->
+                        <div class="setting-section">
+                            <h3 class="setting-title">❓ Suggest Question Topics</h3>
+                            <p class="text-sm text-gray-700 mb-2">What topics should the game ask about? Your suggestions will help generate the questions.</p>
+                            <label for="custom-question-input" class="block text-sm text-gray-600 mb-1">Ask questions about:</label>
+                            
+                            <div id="custom-question-container">
+                                <div class="w-full">
+                                    <textarea id="custom-question-input" rows="2"
+                                        placeholder="Examples: 'childhood memories', 'unpopular opinions', 'dream vacations', 'strange habits', 'food preferences'"
+                                        class="textarea-field w-full mb-2"
+                                        style="min-height: 80px; max-width: 100%; box-sizing: border-box;"></textarea>
+                                    <button id="submit-custom-question" class="button button-primary w-full mb-2"
+                                        style="max-width: 100%;">
+                                        Submit Topic Ideas
+                                    </button>
+                                </div>
+                                
+                                <div class="flex items-center mb-2">
+                                    <p class="text-xs text-gray-500">All players' topic suggestions will be combined to create varied, interesting questions.</p>
+                                    <div class="hidden ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                                        <span id="custom-question-count">0</span> <span id="custom-question-count-label">players contributed</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="start-round-button" class="hidden button button-success w-full">
+                        Start Round
+                    </button>
+                </div>
+            </div>
+
+            <div class="card" id="answer-area">
+                <div id="prompt-area" class="prompt-area"></div>
+
+                <div id="timer-display" class="hidden timer-display timer-normal"></div>
+
+                <textarea id="answer-input" rows="3" placeholder="Your answer..."
+                    class="hidden textarea-field w-full mb-3"></textarea>
+
+                <button id="submit-answer-button"
+                    class="hidden button button-primary w-full mb-4">
+                    Submit Answer
+                </button>
+
+                <div id="public-answers-area" class="mb-5"></div>
+                <div id="voting-area" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/client.js"></script>
+</body>
+
+</html>
