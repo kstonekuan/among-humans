@@ -156,6 +156,7 @@ async function generatePromptWithAI(room: Room): Promise<string> {
     Include no commentary, just the question itself.
     `;
 
+    console.log(`[LLM_CALL] Fallback Question Generator - room ${room.code}`);
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       max_tokens: 1024,
@@ -269,6 +270,7 @@ async function generateMultipleQuestions(room: Room): Promise<void> {
     Include no commentary, just the numbered list of questions.
     `;
 
+    console.log(`[LLM_CALL] Batch Questions Generator - room ${room.code}`);
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       max_tokens: 2048,
@@ -1222,6 +1224,9 @@ async function generateAIAnswerWithContext(
       '\n\nONLY provide the answer, no explanations or context. Answer as a human would in a casual conversation.';
 
     // Send request to OpenAI
+    console.log(
+      `[LLM_CALL] AI Player Answer Generator - room ${room.code} - ${immediateResponse ? 'immediate' : 'scheduled'}`,
+    );
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       max_tokens: 1024,
