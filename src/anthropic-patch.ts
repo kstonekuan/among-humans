@@ -1,5 +1,3 @@
-import { Anthropic } from '@anthropic-ai/sdk';
-
 // Response type for Anthropic API
 interface AnthropicResponse {
   content: Array<{
