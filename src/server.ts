@@ -1,10 +1,10 @@
 import http from 'node:http';
 import path from 'node:path';
-import { Anthropic } from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import express from 'express';
+import OpenAI from 'openai';
 import { Server } from 'socket.io';
-import { extractTextFromResponse } from './anthropic-patch';
+import { extractTextFromResponse } from './openai-patch';
 import { analyzeCasingFromHumanAnswers, casingStyleToString } from './utils/casingAnalyzer';
 import { getRandomPlayerName, playerNames } from './utils/nameGenerator';
 import { combineImposterPrompts } from './utils/promptCombiner';
@@ -13,17 +13,17 @@ import { combineImposterPrompts } from './utils/promptCombiner';
 dotenv.config();
 
 // Initialize LLM client
-let anthropic: Anthropic;
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+let openai: OpenAI;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-if (!ANTHROPIC_API_KEY) {
-  console.error('ERROR: Missing ANTHROPIC_API_KEY environment variable');
+if (!OPENAI_API_KEY) {
+  console.error('ERROR: Missing OPENAI_API_KEY environment variable');
   process.exit(1);
 } else {
-  anthropic = new Anthropic({
-    apiKey: ANTHROPIC_API_KEY,
+  openai = new OpenAI({
+    apiKey: OPENAI_API_KEY,
   });
-  console.log('Anthropic API client initialized');
+  console.log('OpenAI API client initialized');
 }
 
 // Initialize Express app
@@ -167,8 +167,8 @@ async function generatePromptWithAI(room: Room): Promise<string> {
     Include no commentary, just the question itself.
     `;
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-latest',
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 1024,
       messages: [{ role: 'user', content: promptGen }],
     });
@@ -280,8 +280,8 @@ async function generateMultipleQuestions(room: Room): Promise<void> {
     Include no commentary, just the numbered list of questions.
     `;
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-latest',
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 2048,
       messages: [{ role: 'user', content: promptGen }],
     });
@@ -1256,9 +1256,9 @@ async function generateAIAnswerWithContext(
     answerPrompt +=
       '\n\nONLY provide the answer, no explanations or context. Answer as a human would in a casual conversation.';
 
-    // Send request to Claude
-    const response = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-latest',
+    // Send request to OpenAI
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
       max_tokens: 1024,
       messages: [{ role: 'user', content: answerPrompt }],
     });

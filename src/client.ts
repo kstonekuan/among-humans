@@ -493,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create a stats area for final results
         const statsArea = document.createElement('div');
         statsArea.className = 'stats-area';
-        statsArea.innerHTML = '<h3 class="text-lg font-semibold mb-2">Game Results:</h3>';
+        statsArea.innerHTML = '<h3 class="text-lg font-semibold mb-2">🏆 Final Results 🏆</h3>';
 
         // Show detection stats
         const statsList = document.createElement('ul');
@@ -632,8 +632,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Table header
         const tableHeader = document.createElement('div');
         tableHeader.className =
-          'bg-gray-100 border-b border-gray-200 grid grid-cols-4 gap-1 p-2 font-semibold text-sm';
+          'bg-gray-100 border-b border-gray-200 grid grid-cols-5 gap-1 p-2 font-semibold text-sm';
         tableHeader.innerHTML = `
+          <div>Rank</div>
           <div>Player</div>
           <div>Detection Points</div>
           <div>Deception Points</div>
@@ -641,28 +642,47 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         scoreTable.appendChild(tableHeader);
 
-        // Table rows - one for each player
-        for (const [playerId, player] of Object.entries(players)) {
-          // Skip AI player
-          if (playerId === aiPlayer.id) continue;
+        // Sort players by score in descending order
+        const sortedPlayers = Object.entries(players)
+          .filter(([id]) => id !== aiPlayer.id) // Filter out AI player
+          .sort(([, playerA], [, playerB]) => playerB.score - playerA.score);
 
+        // Table rows - one for each player with ranking
+        sortedPlayers.forEach(([playerId, player], index) => {
           // Calculate scores
           const detectionPoints = (playerAIDetectionSuccess[playerId] || 0) * 2; // 2 points per correct detection
-
-          // Calculate votes received excluding the AI's vote
           const votesReceived = playerVotesReceived[playerId] || 0;
-          // Adjust if this player received a vote from the AI
           const totalScore = player.score;
+
+          // Create rank indicator with medal for top 3
+          let rankDisplay = '';
+          if (index === 0) {
+            rankDisplay = '🥇 1st';
+          } else if (index === 1) {
+            rankDisplay = '🥈 2nd';
+          } else if (index === 2) {
+            rankDisplay = '🥉 3rd';
+          } else {
+            rankDisplay = `${index + 1}th`;
+          }
 
           // Create row
           const playerRow = document.createElement('div');
-          playerRow.className = 'grid grid-cols-4 gap-1 p-2 border-b border-gray-200 text-sm';
+          playerRow.className = 'grid grid-cols-5 gap-1 p-2 border-b border-gray-200 text-sm';
+
+          // Highlight current player
           if (playerId === myPlayerId) {
-            playerRow.classList.add('font-bold', 'bg-blue-50');
+            playerRow.classList.add('font-bold', 'bg-blue-100');
+          }
+
+          // Highlight winners
+          if (index === 0) {
+            playerRow.classList.add('bg-yellow-50');
           }
 
           playerRow.innerHTML = `
-            <div>${player.name}</div>
+            <div class="font-semibold">${rankDisplay}</div>
+            <div>${player.name}${playerId === myPlayerId ? ' <span class="text-blue-600">(you)</span>' : ''}</div>
             <div>${detectionPoints} <span class="text-xs text-gray-500">(${
               playerAIDetectionSuccess[playerId] || 0
             } × 2pts)</span></div>
@@ -671,7 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
           `;
 
           scoreTable.appendChild(playerRow);
-        }
+        });
 
         statsArea.appendChild(scoreTable);
 
@@ -1282,7 +1302,7 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     } else {
       // In game, show the player list header
       playerTitle.classList.remove('hidden');
-      playerTitle.textContent = 'Players';
+      playerTitle.textContent = 'Scoreboard';
       votesReceivedLabel.classList.remove('hidden');
     }
   }
@@ -1313,6 +1333,11 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     // but still makes it hard to guess which is the AI
     return a.name.localeCompare(b.name);
   });
+
+  // Show rank numbers if scoring has started
+  let rank = 1;
+  let lastScore = -1;
+  let rankToShow = 1;
 
   for (const player of sortedPlayers) {
     const playerItem = document.createElement('div');
@@ -1346,12 +1371,39 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     // Get first letter of name for avatar
     const firstLetter = player.name.charAt(0).toUpperCase();
 
+    // Calculate rank display
+    let rankDisplay = '';
+    if (hasScoring) {
+      // Update rank only if score changes
+      if (player.score !== lastScore) {
+        rankToShow = rank;
+        lastScore = player.score;
+      }
+
+      // Format rank with emoji for top 3
+      if (rankToShow === 1) {
+        rankDisplay = '🥇 ';
+      } else if (rankToShow === 2) {
+        rankDisplay = '🥈 ';
+      } else if (rankToShow === 3) {
+        rankDisplay = '🥉 ';
+      } else {
+        rankDisplay = `${rankToShow}. `;
+      }
+    }
+
+    // Increment rank counter
+    rank++;
+
     playerItem.innerHTML = `
       <div class="flex items-center">
         <div class="player-avatar ${colorClass}">${firstLetter}</div>
-        <span>${player.name}</span>
+        <span>${rankDisplay}${player.name}${player.id === myPlayerId ? ' <span class="text-blue-600">(you)</span>' : ''}</span>
       </div>
-      <span class="vote-counter">${voteCount}</span>
+      <div class="flex flex-row items-center gap-2">
+        <span class="font-semibold">${player.score}</span>
+        <span class="vote-counter">${voteCount}</span>
+      </div>
     `;
 
     playerList.appendChild(playerItem);
