@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { combineImposterPrompts, combineQuestionPrompts } from '../../src/utils/promptCombiner';
+import { combineImposterPrompts } from '../../src/utils/promptCombiner';
 
 describe('Prompt Combination Functions', () => {
   describe('combineImposterPrompts', () => {
@@ -58,68 +58,6 @@ describe('Prompt Combination Functions', () => {
       expect(result).toContain(testBasePrompt);
       expect(result).toContain('use emojis');
       expect(result).toContain('mention a pet');
-      expect(result).not.toMatch(/\.\s+\./);
-    });
-  });
-
-  describe('combineQuestionPrompts', () => {
-    const testBasePrompt = 'Test base prompt for question generation';
-
-    it('returns the base prompt when no additional prompts are provided', () => {
-      const result = combineQuestionPrompts([], testBasePrompt);
-      expect(result).toBe(testBasePrompt);
-    });
-
-    it('formats single prompt correctly', () => {
-      const result = combineQuestionPrompts(['travel experiences'], testBasePrompt);
-      expect(result).toBe(`${testBasePrompt}. Specifically, ask about: travel experiences`);
-    });
-
-    it('combines multiple topic prompts', () => {
-      const result = combineQuestionPrompts(
-        ['childhood memories', 'favorite movies'],
-        testBasePrompt
-      );
-
-      expect(result).toContain(testBasePrompt);
-      expect(result).toContain('Include a mix of these topics:');
-      expect(result).toContain('childhood memories');
-      expect(result).toContain('favorite movies');
-    });
-
-    it('splits prompts containing multiple topics with punctuation', () => {
-      const result = combineQuestionPrompts(
-        ['travel experiences. food preferences. hobbies'],
-        testBasePrompt
-      );
-
-      expect(result).toContain(testBasePrompt);
-      expect(result).toContain('travel experiences');
-      expect(result).toContain('food preferences');
-      expect(result).toContain('hobbies');
-    });
-
-    it('removes duplicate topics', () => {
-      const result = combineQuestionPrompts(
-        ['travel. adventures. journeys', 'travel. favorite foods'],
-        testBasePrompt
-      );
-
-      // Count occurrences of "travel" in the result
-      const matches = result.match(/travel/g) || [];
-      expect(matches.length).toBe(1);
-
-      expect(result).toContain('adventures');
-      expect(result).toContain('journeys');
-      expect(result).toContain('favorite foods');
-    });
-
-    it('filters out empty topics', () => {
-      const result = combineQuestionPrompts(['hobbies. . pets', ''], testBasePrompt);
-
-      expect(result).toContain(testBasePrompt);
-      expect(result).toContain('hobbies');
-      expect(result).toContain('pets');
       expect(result).not.toMatch(/\.\s+\./);
     });
   });

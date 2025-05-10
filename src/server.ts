@@ -5,13 +5,9 @@ import dotenv from 'dotenv';
 import express from 'express';
 import { Server } from 'socket.io';
 import { extractTextFromResponse } from './anthropic-patch';
-import {
-  CasingStyle,
-  analyzeCasingFromHumanAnswers,
-  casingStyleToString,
-} from './utils/casingAnalyzer';
+import { analyzeCasingFromHumanAnswers, casingStyleToString } from './utils/casingAnalyzer';
 import { getRandomPlayerName, playerNames } from './utils/nameGenerator';
-import { combineImposterPrompts, combineQuestionPrompts } from './utils/promptCombiner';
+import { combineImposterPrompts } from './utils/promptCombiner';
 
 // Load environment variables
 dotenv.config();
@@ -356,17 +352,6 @@ async function selectPromptForRound(room: Room): Promise<string> {
   if (room.generatedQuestions.length === 0) {
     console.log(`[ROOM] No pre-generated questions for room ${room.code}, generating now`);
 
-    // Combine player question prompts if not already combined
-    if (!room.combinedQuestionPrompt && Object.keys(room.playerQuestionPrompts).length > 0) {
-      const prompts = Object.values(room.playerQuestionPrompts);
-
-      // Base guidance for question generation
-      const basePrompt =
-        'Generate engaging, conversational questions that are open-ended but can be answered briefly in a casual conversation';
-
-      room.combinedQuestionPrompt = combineQuestionPrompts(prompts, basePrompt);
-    }
-
     // Generate the batch of questions
     await generateMultipleQuestions(room);
   }
@@ -535,7 +520,6 @@ io.on('connection', (socket) => {
       aiPlayerActive: false,
       playerImposterPrompts: {}, // Initialize empty imposter prompts object
       playerQuestionPrompts: {}, // Initialize empty question generation prompts object
-      combinedQuestionPrompt: undefined, // Will be set when the game starts
       usedQuestions: [], // Initialize empty array to track used questions
       generatedQuestions: [], // Initialize empty array for pre-generated questions
 
@@ -709,20 +693,6 @@ io.on('connection', (socket) => {
       console.log(`[ROOM] Combined ${prompts.length} imposter prompts for room ${room.code}`);
     }
 
-    // Combine all player question prompts (if not already done at game start)
-    if (Object.keys(room.playerQuestionPrompts).length > 0 && !room.combinedQuestionPrompt) {
-      const questionPrompts = Object.values(room.playerQuestionPrompts);
-
-      // Base guidance for question generation
-      const basePrompt =
-        'Generate engaging, conversational questions that are open-ended but can be answered briefly in a casual conversation';
-
-      room.combinedQuestionPrompt = combineQuestionPrompts(questionPrompts, basePrompt);
-      console.log(
-        `[ROOM] Combined ${questionPrompts.length} question prompts for room ${room.code}`
-      );
-    }
-
     // Set game state to challenge
     room.gameState = 'challenge';
 
@@ -738,18 +708,6 @@ io.on('connection', (socket) => {
       console.log(
         `[ROOM] Game started in room ${room.code} with ${Object.keys(room.players).length} players`
       );
-
-      // Combine player question prompts
-      if (Object.keys(room.playerQuestionPrompts).length > 0) {
-        const prompts = Object.values(room.playerQuestionPrompts);
-
-        // Base guidance for question generation
-        const basePrompt =
-          'Generate engaging, conversational questions that are open-ended but can be answered briefly in a casual conversation';
-
-        room.combinedQuestionPrompt = combineQuestionPrompts(prompts, basePrompt);
-        console.log(`[ROOM] Combined ${prompts.length} question prompts for room ${room.code}`);
-      }
 
       // Generate all questions upfront for the entire game
       // Show loading indicator to clients

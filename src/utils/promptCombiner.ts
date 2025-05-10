@@ -53,20 +53,3 @@ export function combineImposterPrompts(prompts: string[], basePrompt: string): s
   // Format: "Base prompt. Also: [player instructions joined with periods]"
   return `${basePrompt} Also: ${uniqueInstructions.join('. ')}`;
 }
-
-/**
- * Combines question generation prompts from players
- * @param prompts Array of player-provided prompts for question generation
- * @param basePrompt Base prompt to use for question generation guidance
- * @returns Combined prompt for generating questions
- */
-export function combineQuestionPrompts(prompts: string[], basePrompt: string): string {
-  if (prompts.length === 0) return basePrompt;
-  if (prompts.length === 1) return `${basePrompt}. Specifically, ask about: ${prompts[0]}`;
-
-  // Extract unique topic suggestions
-  const uniqueTopics = extractUniqueItems(prompts);
-
-  // Create a cohesive prompt for question generation that incorporates the topics
-  return `${basePrompt}. Include a mix of these topics: ${uniqueTopics.join(', ')}`;
-}
