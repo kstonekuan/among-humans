@@ -61,6 +61,11 @@ interface GameComplete {
   combinedImposterPrompt?: string;
   playerImposterPrompts?: Record<string, string>;
   playerQuestionPrompts?: Record<string, string>;
+  currentPrompt?: string;
+  allRoundsVotes?: Array<{
+    roundNumber: number;
+    votes: Record<string, string>;
+  }>;
 }
 
 // Define socket type
@@ -941,8 +946,8 @@ document.addEventListener('DOMContentLoaded', () => {
       statusMessage.textContent = 'Game complete! All rounds finished.';
     }
 
-    // The question generation info is already displayed in the show_vote_results handler
-    // for the last round, so we don't need to add it again here
+    // Create a dedicated final results page
+    createFinalResultsPage(data);
 
     // Show a "New Game" button to restart
     const startButtonContainer = document.getElementById('start-button-container');
@@ -968,6 +973,371 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // Function to create the final results page
+  function createFinalResultsPage(data: GameComplete): void {
+    const {
+      playerAIDetectionSuccess,
+      playerVotesReceived,
+      aiPlayer,
+      players,
+      questionPromptCount,
+      combinedImposterPrompt,
+      playerImposterPrompts,
+      playerQuestionPrompts,
+      combinedQuestionPrompt,
+    } = data;
+
+    // Clear existing content in public answers area
+    const answersArea = document.getElementById('public-answers-area');
+    if (!answersArea) return;
+
+    answersArea.innerHTML = '';
+
+    // Create final results container
+    const resultsContainer = document.createElement('div');
+    resultsContainer.className = 'final-results-container bg-white rounded-lg p-5 shadow-lg';
+
+    // Add header
+    const header = document.createElement('h2');
+    header.className = 'text-2xl font-bold text-center mb-6';
+    header.innerHTML = '🏆 Final Results 🏆';
+    resultsContainer.appendChild(header);
+
+    // Create leaderboard at the top
+    const leaderboardSection = document.createElement('section');
+    leaderboardSection.className = 'mb-8';
+
+    // Create title for leaderboard
+    const leaderboardTitle = document.createElement('h3');
+    leaderboardTitle.className = 'text-xl font-semibold mb-4 border-b pb-2';
+    leaderboardTitle.textContent = 'Leaderboard';
+    leaderboardSection.appendChild(leaderboardTitle);
+
+    // Create the leaderboard table
+    const leaderboardTable = document.createElement('div');
+    leaderboardTable.className = 'w-full overflow-hidden rounded-lg border border-gray-200';
+
+    // Table header
+    const tableHeader = document.createElement('div');
+    tableHeader.className =
+      'grid grid-cols-5 gap-1 p-3 bg-gray-100 border-b border-gray-200 font-semibold';
+    tableHeader.innerHTML = `
+      <div>Rank</div>
+      <div>Player</div>
+      <div>Detection Points</div>
+      <div>Deception Points</div>
+      <div>Total Score</div>
+    `;
+    leaderboardTable.appendChild(tableHeader);
+
+    // Sort players by score in descending order
+    const sortedPlayers = Object.entries(players)
+      .filter(([id]) => id !== aiPlayer.id) // Filter out AI player
+      .sort(([, playerA], [, playerB]) => playerB.score - playerA.score);
+
+    // Add player rows
+    sortedPlayers.forEach(([playerId, player], index) => {
+      // Calculate scores
+      const detectionPoints = (playerAIDetectionSuccess[playerId] || 0) * 2; // 2 points per correct detection
+      const votesReceived = playerVotesReceived[playerId] || 0;
+      const totalScore = player.score;
+
+      // Create rank indicator with medal for top 3
+      let rankDisplay = '';
+      if (index === 0) {
+        rankDisplay = '🥇 1st';
+      } else if (index === 1) {
+        rankDisplay = '🥈 2nd';
+      } else if (index === 2) {
+        rankDisplay = '🥉 3rd';
+      } else {
+        rankDisplay = `${index + 1}th`;
+      }
+
+      // Create row
+      const playerRow = document.createElement('div');
+      playerRow.className = 'grid grid-cols-5 gap-1 p-3 border-b border-gray-200';
+
+      // Highlight current player
+      if (playerId === myPlayerId) {
+        playerRow.classList.add('font-bold', 'bg-blue-100');
+      }
+
+      // Highlight winners
+      if (index === 0) {
+        playerRow.classList.add('bg-yellow-50');
+      }
+
+      playerRow.innerHTML = `
+        <div class="font-semibold">${rankDisplay}</div>
+        <div>${player.name}${playerId === myPlayerId ? ' <span class="text-blue-600">(you)</span>' : ''}</div>
+        <div>${detectionPoints} <span class="text-sm text-gray-500">(${playerAIDetectionSuccess[playerId] || 0} × 2pts)</span></div>
+        <div>${votesReceived} <span class="text-sm text-gray-500">(votes received × 1pt)</span></div>
+        <div class="font-semibold">${totalScore}</div>
+      `;
+
+      leaderboardTable.appendChild(playerRow);
+    });
+
+    // Add AI player as last row with special styling
+    const aiRow = document.createElement('div');
+    aiRow.className = 'grid grid-cols-5 gap-1 p-3 border-b border-gray-200 bg-red-50';
+
+    // AI gets 1 point per round they survived without detection
+    const aiSurvivalPoints = players[aiPlayer.id]?.score || 0;
+
+    aiRow.innerHTML = `
+      <div class="font-semibold">AI</div>
+      <div>${aiPlayer.name} <span class="text-red-600">(AI)</span></div>
+      <div>0</div>
+      <div>${aiSurvivalPoints} <span class="text-sm text-gray-500">(survival × 1pt)</span></div>
+      <div class="font-semibold">${aiSurvivalPoints}</div>
+    `;
+
+    leaderboardTable.appendChild(aiRow);
+    leaderboardSection.appendChild(leaderboardTable);
+    resultsContainer.appendChild(leaderboardSection);
+
+    // Add scoring explanation section
+    const scoringSection = document.createElement('section');
+    scoringSection.className = 'mb-8 p-4 bg-gray-50 rounded-lg';
+
+    const scoringTitle = document.createElement('h3');
+    scoringTitle.className = 'text-xl font-semibold mb-3';
+    scoringTitle.textContent = 'How Scoring Works';
+    scoringSection.appendChild(scoringTitle);
+
+    const scoringExplanation = document.createElement('div');
+    scoringExplanation.className = 'text-sm space-y-2';
+    scoringExplanation.innerHTML = `
+      <p>• <strong>Detection Points:</strong> Human players get +2 points each time they correctly identified the AI</p>
+      <p>• <strong>Deception Points:</strong> Human players get +1 point for each vote received (including votes from the AI)</p>
+      <p>• <strong>AI Points:</strong> The AI gets +1 point for surviving each round without being detected</p>
+    `;
+    scoringSection.appendChild(scoringExplanation);
+    resultsContainer.appendChild(scoringSection);
+
+    // Add AI Imposter Instructions section
+    const imposterSection = document.createElement('section');
+    imposterSection.className = 'mb-8 p-4 bg-gray-50 rounded-lg';
+
+    const imposterTitle = document.createElement('h3');
+    imposterTitle.className = 'text-xl font-semibold mb-3';
+    imposterTitle.textContent = 'AI Imposter Instructions';
+    imposterSection.appendChild(imposterTitle);
+
+    // Include explanation of AI's behavior
+    const aiExplanation = document.createElement('p');
+    aiExplanation.className = 'mb-4 italic';
+    aiExplanation.textContent = `The AI imposter (${aiPlayer.name}) was instructed to answer questions while trying to blend in with human players.`;
+    imposterSection.appendChild(aiExplanation);
+
+    // Show combined imposter prompt if available
+    if (combinedImposterPrompt) {
+      const combinedPromptDiv = document.createElement('div');
+      combinedPromptDiv.className = 'mb-4 p-3 bg-white rounded border border-gray-200';
+
+      const combinedPromptTitle = document.createElement('h4');
+      combinedPromptTitle.className = 'font-semibold mb-2';
+      combinedPromptTitle.textContent = 'Combined Instructions:';
+      combinedPromptDiv.appendChild(combinedPromptTitle);
+
+      const combinedPromptText = document.createElement('p');
+      combinedPromptText.className = 'text-sm italic';
+      combinedPromptText.textContent = combinedImposterPrompt;
+      combinedPromptDiv.appendChild(combinedPromptText);
+
+      imposterSection.appendChild(combinedPromptDiv);
+    }
+
+    // Show individual player instructions
+    if (playerImposterPrompts && Object.keys(playerImposterPrompts).length > 0) {
+      const playerPromptSection = document.createElement('div');
+      playerPromptSection.className = 'mt-4';
+
+      const playerPromptTitle = document.createElement('h4');
+      playerPromptTitle.className = 'font-semibold mb-2';
+      playerPromptTitle.textContent = 'Individual Player Instructions:';
+      playerPromptSection.appendChild(playerPromptTitle);
+
+      // Create a collapsible section
+      const playerPromptToggle = document.createElement('button');
+      playerPromptToggle.className = 'text-blue-500 hover:text-blue-700 mb-2 text-sm font-semibold';
+      playerPromptToggle.textContent = 'Show Individual Instructions';
+      playerPromptSection.appendChild(playerPromptToggle);
+
+      const playerPromptContent = document.createElement('div');
+      playerPromptContent.className = 'hidden space-y-2';
+
+      // Sort entries by player name
+      const sortedPrompts = Object.entries(playerImposterPrompts)
+        .map(([playerId, prompt]) => ({
+          playerName: players[playerId]?.name || 'Unknown Player',
+          playerId,
+          prompt,
+        }))
+        .sort((a, b) => a.playerName.localeCompare(b.playerName));
+
+      for (const { playerName, playerId, prompt } of sortedPrompts) {
+        const promptItem = document.createElement('div');
+        promptItem.className = 'p-2 bg-white rounded border border-gray-200';
+
+        const promptHeader = document.createElement('div');
+        promptHeader.className = 'font-semibold';
+        promptHeader.innerHTML = `${playerName}${playerId === myPlayerId ? ' <span class="text-blue-600">(you)</span>' : ''}:`;
+        promptItem.appendChild(promptHeader);
+
+        const promptText = document.createElement('div');
+        promptText.className = 'text-sm italic ml-4';
+        promptText.textContent = prompt;
+        promptItem.appendChild(promptText);
+
+        playerPromptContent.appendChild(promptItem);
+      }
+
+      playerPromptSection.appendChild(playerPromptContent);
+      imposterSection.appendChild(playerPromptSection);
+
+      // Add toggle functionality
+      playerPromptToggle.addEventListener('click', () => {
+        const isHidden = playerPromptContent.classList.contains('hidden');
+        playerPromptContent.classList.toggle('hidden', !isHidden);
+        playerPromptToggle.textContent = isHidden
+          ? 'Hide Individual Instructions'
+          : 'Show Individual Instructions';
+      });
+    }
+
+    resultsContainer.appendChild(imposterSection);
+
+    // Add question history section
+    // Create collapsible rounds history
+    const roundsHistorySection = document.createElement('section');
+    roundsHistorySection.className = 'mt-8';
+
+    const roundsHistoryTitle = document.createElement('h3');
+    roundsHistoryTitle.className = 'text-xl font-semibold mb-4 border-b pb-2';
+    roundsHistoryTitle.textContent = 'Round-by-Round History';
+    roundsHistorySection.appendChild(roundsHistoryTitle);
+
+    // Get history from rounds data
+    if (data.allRoundsVotes && data.allRoundsVotes.length > 0) {
+      // Sort rounds chronologically
+      const sortedRounds = [...data.allRoundsVotes].sort((a, b) => a.roundNumber - b.roundNumber);
+
+      // Create accordion for all rounds
+      const roundsAccordion = document.createElement('div');
+      roundsAccordion.className = 'space-y-3';
+
+      sortedRounds.forEach((round) => {
+        const roundPanel = document.createElement('div');
+        roundPanel.className = 'border border-gray-200 rounded-lg overflow-hidden';
+
+        // Create header button
+        const roundHeader = document.createElement('button');
+        roundHeader.className =
+          'w-full bg-gray-100 px-4 py-3 text-left font-semibold flex items-center justify-between hover:bg-gray-200';
+        roundHeader.innerHTML = `
+          <span>Round ${round.roundNumber}</span>
+          <span class="text-gray-500 text-sm">▼</span>
+        `;
+        roundPanel.appendChild(roundHeader);
+
+        // Create collapsible content
+        const roundContent = document.createElement('div');
+        roundContent.className = 'hidden p-4 bg-white';
+
+        // Try to get the prompt for this round
+        // In the current implementation, we don't have all prompts from previous rounds
+        let roundPrompt = 'Question not available';
+
+        // If this is the last round and we have currentPrompt available, use it
+        if (data.currentPrompt && round.roundNumber === sortedRounds.length) {
+          roundPrompt = data.currentPrompt;
+        }
+
+        // Add the question
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'mb-4';
+        questionDiv.innerHTML = `
+          <h4 class="font-semibold mb-2">Question:</h4>
+          <p class="italic">${roundPrompt}</p>
+        `;
+        roundContent.appendChild(questionDiv);
+
+        // Add answers section
+        const answersDiv = document.createElement('div');
+        answersDiv.className = 'mb-4';
+        answersDiv.innerHTML = `<h4 class="font-semibold mb-2">Answers:</h4>`;
+
+        // We would need to store answers history to show them here
+        // This would require server-side changes to store all rounds' answers
+        answersDiv.innerHTML += `<p class="text-sm text-gray-500">(Answers not available in history)</p>`;
+        roundContent.appendChild(answersDiv);
+
+        // Add voting results
+        const votingDiv = document.createElement('div');
+        votingDiv.className = 'mb-2';
+        votingDiv.innerHTML = `<h4 class="font-semibold mb-2">Voting Results:</h4>`;
+
+        // Count votes for each player
+        const voteCounts: Record<string, number> = {};
+        if (round.votes) {
+          for (const votedForId of Object.values(round.votes)) {
+            if (typeof votedForId === 'string') {
+              voteCounts[votedForId] = (voteCounts[votedForId] || 0) + 1;
+            }
+          }
+        }
+
+        // Create a list of who voted for whom
+        const votesList = document.createElement('ul');
+        votesList.className = 'list-disc pl-5 text-sm space-y-1';
+
+        Object.entries(voteCounts).forEach(([votedForId, count]) => {
+          const playerName = players[votedForId]?.name || 'Unknown';
+          const isAI = votedForId === aiPlayer.id;
+
+          const voteItem = document.createElement('li');
+          voteItem.innerHTML = `
+            <span class="${isAI ? 'text-red-600 font-semibold' : ''}">${playerName}${isAI ? ' (AI)' : ''}</span>:
+            received ${count} vote${count !== 1 ? 's' : ''}
+          `;
+          votesList.appendChild(voteItem);
+        });
+
+        votingDiv.appendChild(votesList);
+        roundContent.appendChild(votingDiv);
+
+        roundPanel.appendChild(roundContent);
+        roundsAccordion.appendChild(roundPanel);
+
+        // Add toggle functionality
+        roundHeader.addEventListener('click', () => {
+          const isHidden = roundContent.classList.contains('hidden');
+          roundContent.classList.toggle('hidden', !isHidden);
+          const arrow = roundHeader.querySelector('span:last-child');
+          if (arrow) {
+            arrow.textContent = isHidden ? '▲' : '▼';
+          }
+        });
+      });
+
+      roundsHistorySection.appendChild(roundsAccordion);
+    } else {
+      // No rounds data available
+      const noRoundsMessage = document.createElement('p');
+      noRoundsMessage.className = 'text-gray-500 italic';
+      noRoundsMessage.textContent = 'No round history available.';
+      roundsHistorySection.appendChild(noRoundsMessage);
+    }
+
+    resultsContainer.appendChild(roundsHistorySection);
+
+    // Append the entire results container to the answers area
+    answersArea.appendChild(resultsContainer);
+  }
 
   // Add event listeners for UI elements
   setupEventListeners();
