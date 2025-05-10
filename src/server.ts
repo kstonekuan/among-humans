@@ -27,9 +27,7 @@ if (!OPENAI_API_KEY) {
 const app = express();
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 
-// Game duration constants (in milliseconds)
-const DEFAULT_ANSWER_DURATION = 45000; // 45 seconds for answering
-const DEFAULT_VOTING_DURATION = 20000; // 20 seconds for voting
+// No timer duration constants needed since time limits are not enforced
 
 const httpServer = http.createServer(app);
 
@@ -736,13 +734,10 @@ io.on('connection', (socket) => {
           player.hasVotedThisRound = false;
         }
 
-        // Use default answer duration
-        const roundDuration = DEFAULT_ANSWER_DURATION;
-
         // Emit start_challenge event to all clients in the room, including round info
         io.to(room.code).emit('start_challenge', {
           prompt: room.currentRoundData.prompt,
-          duration: roundDuration,
+          duration: 0, // Duration no longer needed
           currentRound: room.currentRound,
           totalRounds: room.totalRounds,
         });
@@ -759,43 +754,10 @@ io.on('connection', (socket) => {
         room.roundsHistory.push(historyEntry);
 
         // Trigger AI answer generation
-        generateAIAnswer(room, room.currentRoundData.prompt, roundDuration);
+        generateAIAnswer(room, room.currentRoundData.prompt);
 
-        // Start round timer
-        setTimeout(() => {
-          // Auto-submit answers for any players who haven't answered yet
-          const humanParticipants = Object.values(room.currentRoundData.participants).filter(
-            (p) => !p.isAI,
-          );
-          for (const player of humanParticipants) {
-            if (!player.hasAnswered && room.gameState === 'challenge') {
-              console.log(
-                `[ROOM] Auto-submitting answer for player ${player.id} in room ${room.code} because timer expired`,
-              );
-
-              // For auto-submission, we need to get the client's current input value
-              // The client will handle this part by sending whatever is in the input field
-              // Here we just ensure we have an empty entry that the client can fill
-              room.currentRoundData.answers[player.id] = {
-                playerId: player.id,
-                answer: '', // Empty answer - client will handle sending partial content
-                timeSpent: 0, // Time's up
-              };
-
-              // Mark player as having answered
-              player.hasAnswered = true;
-
-              // Notify the client that their answer was auto-submitted
-              io.to(player.id).emit('status_update', "Time's up! Your answer has been submitted.");
-            }
-          }
-
-          // Add a short delay before ending the challenge phase
-          // This allows time for any client-side auto-submissions to arrive
-          setTimeout(() => {
-            endChallengePhase(room);
-          }, 500); // 500ms delay to collect all partial answers
-        }, roundDuration);
+        // No round timer for auto-submission
+        // Players can take as long as they want to answer
       })
       .catch((error) => {
         console.error('Error generating prompt:', error);
@@ -818,13 +780,10 @@ io.on('connection', (socket) => {
           player.hasVotedThisRound = false;
         }
 
-        // Use default answer duration for fallback case (slightly shorter time)
-        const roundDuration = Math.min(DEFAULT_ANSWER_DURATION, 30000); // Use default config or 30 seconds max in fallback case
-
         // Emit start_challenge event to all clients in the room, including round info
         io.to(room.code).emit('start_challenge', {
           prompt: room.currentRoundData.prompt,
-          duration: roundDuration,
+          duration: 30000, // Shorter duration for fallback case, for client-side tracking only
           currentRound: room.currentRound,
           totalRounds: room.totalRounds,
         });
@@ -833,43 +792,10 @@ io.on('connection', (socket) => {
         io.to(room.code).emit('hide_game_controls');
 
         // Trigger AI answer generation
-        generateAIAnswer(room, room.currentRoundData.prompt, roundDuration);
+        generateAIAnswer(room, room.currentRoundData.prompt);
 
-        // Start round timer
-        setTimeout(() => {
-          // Auto-submit answers for any players who haven't answered yet
-          const humanParticipants = Object.values(room.currentRoundData.participants).filter(
-            (p) => !p.isAI,
-          );
-          for (const player of humanParticipants) {
-            if (!player.hasAnswered && room.gameState === 'challenge') {
-              console.log(
-                `[ROOM] Auto-submitting answer for player ${player.id} in room ${room.code} because timer expired`,
-              );
-
-              // For auto-submission, we need to get the client's current input value
-              // The client will handle this part by sending whatever is in the input field
-              // Here we just ensure we have an empty entry that the client can fill
-              room.currentRoundData.answers[player.id] = {
-                playerId: player.id,
-                answer: '', // Empty answer - client will handle sending partial content
-                timeSpent: 0, // Time's up
-              };
-
-              // Mark player as having answered
-              player.hasAnswered = true;
-
-              // Notify the client that their answer was auto-submitted
-              io.to(player.id).emit('status_update', "Time's up! Your answer has been submitted.");
-            }
-          }
-
-          // Add a short delay before ending the challenge phase
-          // This allows time for any client-side auto-submissions to arrive
-          setTimeout(() => {
-            endChallengePhase(room);
-          }, 500); // 500ms delay to collect all partial answers
-        }, roundDuration);
+        // No round timer for auto-submission
+        // Players can take as long as they want to answer
       });
   });
 
@@ -1372,11 +1298,7 @@ async function generateAndSubmitAIAnswer(room: Room, gamePrompt: string | null):
   }
 }
 
-async function generateAIAnswer(
-  room: Room,
-  gamePrompt: string | null,
-  _roundDuration: number,
-): Promise<void> {
+async function generateAIAnswer(room: Room, gamePrompt: string | null): Promise<void> {
   // Store the promise for potential cancellation
   room.pendingAIAnswerPromise = (async () => {
     // Don't generate answer if AI is not active or prompt is null
@@ -1481,28 +1403,8 @@ function endChallengePhase(room: Room): void {
   // Don't end if not in challenge phase
   if (room.gameState !== 'challenge') return;
 
-  // First ensure all human participants have an answer entry before proceeding
-  const humanParticipants = Object.values(room.currentRoundData.participants).filter(
-    (p) => !p.isAI,
-  );
-  for (const player of humanParticipants) {
-    if (!room.currentRoundData.answers[player.id]) {
-      console.log(
-        `[ROOM] Auto-creating placeholder answer for player ${player.id} in room ${room.code} in endChallengePhase`,
-      );
-
-      // For the endChallengePhase case, we need to handle players who never submitted answers
-      // Create a placeholder entry that will show their current input (or empty if none)
-      room.currentRoundData.answers[player.id] = {
-        playerId: player.id,
-        answer: '', // Empty answer - client might have partial content
-        timeSpent: 0, // Time's up
-      };
-
-      // Mark player as having answered
-      player.hasAnswered = true;
-    }
-  }
+  // Only include answers from players who have submitted them
+  // No auto-creation of placeholder answers
 
   // Collect all answers
   const collectedAnswers = Object.values(room.currentRoundData.participants).map((participant) => {
@@ -1567,14 +1469,11 @@ function startVotingPhase(room: Room): void {
     player.hasVotedThisRound = false;
   }
 
-  // Set duration for the voting phase
-  const votingDuration = DEFAULT_VOTING_DURATION;
-
-  // Emit start_voting event to all clients in this room with duration
+  // Emit start_voting event to all clients in this room
   io.to(room.code).emit('start_voting', {
     participants: room.currentRoundData.participants,
     aiPlayer: { id: room.aiPlayerId, name: room.currentAiPlayerName },
-    duration: votingDuration,
+    duration: 0, // Duration no longer needed
   });
 
   // AI will vote when last human votes

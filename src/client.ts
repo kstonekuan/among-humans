@@ -339,14 +339,14 @@ document.addEventListener('DOMContentLoaded', () => {
    * @param duration Duration in milliseconds
    * @param message Status message to show
    */
-  function startTimer(duration: number, message: string): void {
+  function setGamePhase(duration: number, message: string): void {
     // Update status message with the current game phase
     const statusMessage = document.getElementById('status-message');
     if (statusMessage) {
       statusMessage.textContent = message;
     }
 
-    // Keep track of round duration for calculating time spent on answers
+    // Keep track of when the game phase started for calculating time spent on answers
     roundEndTime = Date.now() + duration;
   }
 
@@ -430,8 +430,8 @@ document.addEventListener('DOMContentLoaded', () => {
       clearElementContent('public-answers-area');
       clearElementContent('voting-area');
 
-      // Start the timer for the challenge phase
-      startTimer(data.duration, 'Answer the question before time runs out!');
+      // Set up the challenge phase
+      setGamePhase(data.duration, 'Answer the question when ready.');
     },
   );
 
@@ -546,11 +546,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Store participants for looking up player IDs
     Object.assign(currentPlayers, data.participants);
 
-    // Start the timer for the voting phase
-    startTimer(duration, 'Click on an answer to vote for who you think is the AI!');
+    // Set up the voting phase
+    setGamePhase(duration, 'Click on an answer to vote for who you think is the AI!');
 
-    // We now vote by clicking on answers, so we don't need to show the voting area
-    // but we keep the element around for timer expiration logic
+    // We vote by clicking on answers, so we don't need to show the voting area
     const votingArea = document.getElementById('voting-area');
     if (votingArea) {
       votingArea.innerHTML = ''; // Clear it but don't show it
