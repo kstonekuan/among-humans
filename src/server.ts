@@ -168,7 +168,7 @@ async function generatePromptWithAI(room: Room): Promise<string> {
     `;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4.1-mini',
       max_tokens: 1024,
       messages: [{ role: 'user', content: promptGen }],
     });
@@ -281,7 +281,7 @@ async function generateMultipleQuestions(room: Room): Promise<void> {
     `;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4.1-mini',
       max_tokens: 2048,
       messages: [{ role: 'user', content: promptGen }],
     });
@@ -1258,7 +1258,7 @@ async function generateAIAnswerWithContext(
 
     // Send request to OpenAI
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4.1-mini',
       max_tokens: 1024,
       messages: [{ role: 'user', content: answerPrompt }],
     });
