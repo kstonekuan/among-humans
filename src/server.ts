@@ -27,7 +27,7 @@ if (!OPENAI_API_KEY) {
 const app = express();
 const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 
-// Default timer durations (in milliseconds)
+// Game duration constants (in milliseconds)
 const DEFAULT_ANSWER_DURATION = 45000; // 45 seconds for answering
 const DEFAULT_VOTING_DURATION = 20000; // 20 seconds for voting
 
@@ -93,7 +93,7 @@ type Room = {
   currentRound: number;
   roundsCompleted: boolean;
 
-  // Timer configuration removed
+  // Game phase durations
 
   // Track votes across rounds
   allRoundsVotes: Array<{
@@ -519,7 +519,7 @@ io.on('connection', (socket) => {
       currentRound: 0,
       roundsCompleted: false,
 
-      // Timer durations removed
+      // Use default game durations
 
       // Initialize empty tracking arrays/objects
       allRoundsVotes: [],
@@ -1085,7 +1085,7 @@ io.on('connection', (socket) => {
     io.to(room.code).emit('disable_rounds_input', validatedRoundCount);
   });
 
-  // Timer configuration event handlers removed
+  // Game configuration handlers
 
   // Handle submitting a question generation prompt
   socket.on('submit_custom_question', (data: { customQuestion: string }) => {
@@ -1567,7 +1567,7 @@ function startVotingPhase(room: Room): void {
     player.hasVotedThisRound = false;
   }
 
-  // Use default voting duration
+  // Set duration for the voting phase
   const votingDuration = DEFAULT_VOTING_DURATION;
 
   // Emit start_voting event to all clients in this room with duration
@@ -1577,8 +1577,8 @@ function startVotingPhase(room: Room): void {
     duration: votingDuration,
   });
 
-  // AI will vote when last human votes or after a timeout
-  // We don't need to set a timeout for ending voting phase as it will end when all players vote
+  // AI will vote when last human votes
+  // Voting phase ends when all players have voted
 }
 
 function determineAndCastAIVote(room: Room): void {

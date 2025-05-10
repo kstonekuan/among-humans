@@ -92,8 +92,7 @@ type Socket = {
 let socket: Socket;
 let myPlayerId = '';
 let myRoomCode = ''; // Will store the current room code
-let roundEndTime = 0;
-// Timer variables removed
+let roundEndTime = 0; // For calculating time spent on answers
 let playerVotesReceived: Record<string, number> = {}; // Track votes received by each player
 const currentPlayers: Record<string, Player> = {}; // Store current players to look up player IDs
 
@@ -336,18 +335,18 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   /**
-   * Helper function to start or reset a round timer
+   * Helper function to set up a game phase
    * @param duration Duration in milliseconds
    * @param message Status message to show
    */
   function startTimer(duration: number, message: string): void {
-    // Update status message only, no timer display
+    // Update status message with the current game phase
     const statusMessage = document.getElementById('status-message');
     if (statusMessage) {
       statusMessage.textContent = message;
     }
 
-    // Keep track of when the round would end (for calculating timeSpent)
+    // Keep track of round duration for calculating time spent on answers
     roundEndTime = Date.now() + duration;
   }
 
@@ -446,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle public answers event
   socket.on('show_public_answers', (publicAnswers: PublicAnswer[]) => {
-    // Timer display code removed
+    // Update game state to show answers
 
     const statusMessage = document.getElementById('status-message');
     if (statusMessage) {
@@ -595,7 +594,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle vote results event
   socket.on('show_vote_results', (data: VoteResults) => {
-    // Timer code removed
+    // Prepare for showing vote results
 
     // Extract relevant data
     const {
@@ -1820,7 +1819,7 @@ function setupEventListeners(): void {
   // Timer setting event handlers removed
 }
 
-// Timer display functionality removed
+// Game phase transition code
 
 // Define raw colors directly - bypass Tailwind completely
 const rawColors = [
