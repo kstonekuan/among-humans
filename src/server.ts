@@ -520,8 +520,9 @@ io.on('connection', (socket) => {
       playerAIDetectionSuccess: {},
     };
 
-    // Assign a random name to the player
-    const usedNames: string[] = [];
+    // Get a list of player names already used in this room (empty at this point, but using the same pattern)
+    const usedNames: string[] = Object.values(rooms[roomCode].players).map((player) => player.name);
+    // Assign a random name to the player that isn't already in use
     const randomName = getRandomPlayerName(usedNames);
 
     // Create new player
@@ -578,8 +579,9 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Assign a random name to the player
-    const usedNames: string[] = [];
+    // Get a list of player names already used in this room
+    const usedNames: string[] = Object.values(room.players).map((player) => player.name);
+    // Assign a random name to the player that isn't already in use
     const randomName = getRandomPlayerName(usedNames);
 
     // Create new player

@@ -95,6 +95,7 @@ let myRoomCode = ''; // Will store the current room code
 let roundEndTime = 0;
 let timerInterval: number | null = null;
 let playerVotesReceived: Record<string, number> = {}; // Track votes received by each player
+const currentPlayers: Record<string, Player> = {}; // Store current players to look up player IDs
 
 // Track player colors for the current room
 const playerColors: Record<string, string> = {};
@@ -286,6 +287,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Handle player list updates
   socket.on('update_players', (serverPlayers: Record<string, Player>) => {
     console.log('[COLOR_DEBUG] update_players event received, rendering player list');
+
+    // Store the current players list to use for answer-to-player mapping
+    Object.assign(currentPlayers, serverPlayers);
+
     renderPlayerList(serverPlayers);
 
     // Check player colors after rendering
@@ -431,7 +436,10 @@ document.addEventListener('DOMContentLoaded', () => {
               roundsInfo = document.createElement('div');
               roundsInfo.id = 'rounds-info';
               roundsInfo.className = 'rounds-counter';
-              roomInfoArea.querySelector('.flex')?.appendChild(roundsInfo);
+              const flexContainer = roomInfoArea.querySelector('.flex');
+              if (flexContainer) {
+                flexContainer.appendChild(roundsInfo);
+              }
             }
             // Update the rounds info to show current round
             roundsInfo.textContent = `Round ${data.currentRound} of ${data.totalRounds}`;
@@ -515,51 +523,135 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Display the answers in the order provided by the server
       // (randomly shuffled by the server)
-      for (const answer of publicAnswers) {
+      for (let i = 0; i < publicAnswers.length; i++) {
+        const answer = publicAnswers[i];
+
         // Always show the answer card, even if the answer is empty
         const answerCard = document.createElement('div');
-        answerCard.className = 'answer-card';
+        answerCard.className = 'answer-card vote-enabled';
+
+        // Hide player names during voting phase, show only the answer
         answerCard.innerHTML = `
-          <div class="mb-1"><span class="font-semibold">${answer.name}</span></div>
+          <div class="mb-1"><span class="font-semibold answer-player-name" data-player-name="${answer.name}"></span></div>
           <div>${answer.answer || '<em class="text-gray-400">No answer provided</em>'}</div>
         `;
+
+        // Store the player name as data attribute for later
+        answerCard.dataset.playerName = answer.name;
+
+        // Add voting click handler
+        answerCard.addEventListener('click', () => {
+          // Find which player ID this answer belongs to
+          const playerName = answerCard.dataset.playerName;
+          const playerEntry = Object.entries(currentPlayers).find(
+            ([, player]) => player.name === playerName,
+          );
+
+          if (playerEntry && playerEntry[0] !== myPlayerId) {
+            // Cast vote for this player
+            castVote(playerEntry[0]);
+
+            // Add visual indication that this answer was voted for
+            const allAnswerCards = document.querySelectorAll('.answer-card');
+            for (const card of Array.from(allAnswerCards)) {
+              card.classList.remove('selected-answer');
+              card.classList.remove('vote-enabled');
+            }
+
+            answerCard.classList.add('selected-answer');
+
+            // Update status
+            const statusMsg = document.getElementById('status-message');
+            if (statusMsg) {
+              statusMsg.textContent = 'Vote cast! Waiting for results...';
+            }
+          } else if (playerEntry && playerEntry[0] === myPlayerId) {
+            // Can't vote for yourself
+            answerCard.classList.add('cannot-vote');
+            setTimeout(() => {
+              answerCard.classList.remove('cannot-vote');
+            }, 1000);
+          }
+        });
+
+        // Add hover styling for clickable answers
+        answerCard.style.cursor = 'pointer';
+        answerCard.style.transition = 'background-color 0.2s';
+
         answersArea.appendChild(answerCard);
       }
+
+      // Add some basic styling for interactivity
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .vote-enabled:hover {
+          background-color: #f0f9ff !important;
+          border-color: #3b82f6 !important;
+        }
+        .selected-answer {
+          background-color: #dbeafe !important;
+          border-color: #2563eb !important;
+          border-width: 2px !important;
+        }
+        .cannot-vote {
+          background-color: #fee2e2 !important;
+          border-color: #ef4444 !important;
+          transition: background-color 0.2s, border-color 0.2s;
+        }
+      `;
+      document.head.appendChild(style);
     }
   });
 
   // Handle start voting event
   socket.on('start_voting', (data: VoteData) => {
-    const { participants, duration = 30000 } = data;
+    const { duration = 30000 } = data;
+
+    // Store participants for looking up player IDs
+    Object.assign(currentPlayers, data.participants);
 
     // Start the timer for the voting phase
-    startTimer(duration, 'Vote for the player you suspect is the AI!');
+    startTimer(duration, 'Click on an answer to vote for who you think is the AI!');
 
-    // Display voting options
+    // We now vote by clicking on answers, so we don't need to show the voting area
+    // but we keep the element around for timer expiration logic
     const votingArea = document.getElementById('voting-area');
     if (votingArea) {
-      votingArea.innerHTML = '<h3 class="text-lg font-semibold mb-3">Cast Your Vote:</h3>';
-      votingArea.classList.remove('hidden');
+      votingArea.innerHTML = ''; // Clear it but don't show it
+      votingArea.classList.add('hidden');
+    }
 
-      for (const player of Object.values(participants)) {
-        // Don't show vote button for self
-        if (player.id !== myPlayerId) {
-          const voteButton = document.createElement('button');
-          voteButton.className = 'vote-button';
-          voteButton.textContent = player.name;
-          voteButton.addEventListener('click', () => {
-            castVote(player.id);
+    // Add a hint at the top of the public answers area to make it clear how to vote
+    const answersArea = document.getElementById('public-answers-area');
+    if (answersArea?.firstChild) {
+      const votingHint = document.createElement('div');
+      votingHint.className = 'voting-hint mb-4 p-3 bg-blue-50 rounded-lg text-center';
+      votingHint.innerHTML =
+        '<p class="font-semibold">Click on an answer to vote for who you think is the AI</p>';
+      answersArea.insertBefore(votingHint, answersArea.firstChild.nextSibling);
+    }
 
-            // Disable all vote buttons after voting
-            const allVoteButtons = Array.from(votingArea.querySelectorAll('button'));
-            for (const button of allVoteButtons) {
-              (button as HTMLButtonElement).disabled = true;
-              button.classList.add('opacity-50');
-            }
-          });
+    // Add visual cues to answer cards and label only your own answer
+    const answerCards = document.querySelectorAll('.answer-card');
+    for (const card of Array.from(answerCards)) {
+      const playerName = (card as HTMLElement).dataset.playerName;
+      const playerEntry = Object.entries(currentPlayers).find(
+        ([, player]) => player.name === playerName,
+      );
 
-          votingArea.appendChild(voteButton);
+      if (playerEntry && playerEntry[0] === myPlayerId) {
+        // This is the current player's answer - label it and make it not clickable
+        const nameElement = card.querySelector('.answer-player-name');
+        if (nameElement) {
+          nameElement.textContent = 'Your answer';
+          nameElement.className = 'font-semibold answer-player-name text-blue-600';
         }
+        card.classList.remove('vote-enabled');
+        (card as HTMLElement).style.cursor = 'default';
+        card.classList.add('my-answer');
+      } else if (!card.classList.contains('vote-enabled')) {
+        // Make other answers clickable
+        card.classList.add('vote-enabled');
       }
     }
   });
@@ -620,17 +712,36 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update player list with new scores
     renderPlayerList(players);
 
-    // Mark the AI player in the answers area only if revealAI is true (last round)
+    // Mark the AI player in the answers area and reveal all player names
     const answersArea = document.getElementById('public-answers-area');
-    if (answersArea && revealAI) {
+    if (answersArea) {
+      // Remove the voting hint if it exists
+      const votingHint = answersArea.querySelector('.voting-hint');
+      if (votingHint) {
+        votingHint.remove();
+      }
+
+      // Reveal all player names by replacing "Player X" with actual names
       const answerCards = Array.from(answersArea.querySelectorAll('.answer-card'));
 
       for (const card of answerCards) {
-        const playerNameElement = card.querySelector('.font-semibold');
+        // Get the player name from the data attribute
+        const playerNameElement = card.querySelector('.answer-player-name');
+        const playerName = playerNameElement?.getAttribute('data-player-name');
 
-        if (playerNameElement && playerNameElement.textContent === aiPlayer.name) {
-          card.classList.add('answer-card-ai');
-          card.innerHTML = `${card.innerHTML}<div class="mt-2 italic text-red-600">(This was the AI)</div>`;
+        if (playerNameElement && playerName) {
+          // Replace "Player X" with actual name
+          playerNameElement.textContent = playerName;
+
+          // Mark AI player if we're revealing the AI
+          if (revealAI && playerName === aiPlayer.name) {
+            card.classList.add('answer-card-ai');
+            card.innerHTML += `<div class="mt-2 italic text-red-600">(This was the AI)</div>`;
+          }
+
+          // Remove clickability
+          card.classList.remove('vote-enabled');
+          (card as HTMLElement).style.cursor = 'default';
         }
       }
 
@@ -873,7 +984,10 @@ document.addEventListener('DOMContentLoaded', () => {
           roundsInfo = document.createElement('div');
           roundsInfo.id = 'rounds-info';
           roundsInfo.className = 'rounds-counter';
-          roomInfoArea.querySelector('.flex')?.appendChild(roundsInfo);
+          const flexContainer = roomInfoArea.querySelector('.flex');
+          if (flexContainer) {
+            flexContainer.appendChild(roundsInfo);
+          }
         }
 
         if (isLastRound) {
@@ -888,10 +1002,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Also show a message in the answers area
       if (!isLastRound) {
+        // We already checked that answersArea exists above
         const waitingMessage = document.createElement('div');
         waitingMessage.className = 'bg-blue-50 p-3 rounded-lg mt-4 text-center';
         waitingMessage.innerHTML = '<- Click next round when everyone is ready!';
-        answersArea.appendChild(waitingMessage);
+        // Cast to HTMLElement to handle the type error
+        (answersArea as HTMLElement).appendChild(waitingMessage);
       }
     }
   });
@@ -1805,7 +1921,7 @@ function updateTimerDisplay(): void {
     // Determine which phase we're in by checking elements
     const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
     const submitButton = document.getElementById('submit-answer-button') as HTMLButtonElement;
-    const votingArea = document.getElementById('voting-area');
+    // votingArea is intentionally unused here as we only need to check for voting-hint
 
     // Handle challenge phase expiration
     if (answerInput && !answerInput.classList.contains('hidden')) {
@@ -1837,20 +1953,30 @@ function updateTimerDisplay(): void {
         }
       }
     }
-    // Handle voting phase expiration
-    else if (votingArea && !votingArea.classList.contains('hidden')) {
-      // Auto-vote for a random player if no vote was cast
-      const voteButtons = Array.from(votingArea.querySelectorAll('button:not([disabled])'));
-      if (voteButtons.length > 0) {
-        // Pick a random player to vote for
-        const randomIndex = Math.floor(Math.random() * voteButtons.length);
-        (voteButtons[randomIndex] as HTMLButtonElement).click();
-      }
+    // Handle voting phase expiration - now we need to check if we're in voting phase
+    else if (document.querySelector('.voting-hint')) {
+      // We're in the voting phase, find all clickable answer cards
+      const answerCards = Array.from(document.querySelectorAll('.answer-card.vote-enabled'));
 
-      // Update status
-      const statusMessage = document.getElementById('status-message');
-      if (statusMessage) {
-        statusMessage.textContent = "Time's up! A random vote has been cast.";
+      // Filter out cards that are the current player (can't vote for yourself)
+      const validCards = answerCards.filter((card) => {
+        const playerName = (card as HTMLElement).dataset.playerName;
+        const playerEntry = Object.entries(currentPlayers).find(
+          ([, player]) => player.name === playerName,
+        );
+        return playerEntry && playerEntry[0] !== myPlayerId;
+      });
+
+      if (validCards.length > 0) {
+        // Pick a random player to vote for
+        const randomIndex = Math.floor(Math.random() * validCards.length);
+        (validCards[randomIndex] as HTMLElement).click();
+
+        // Update status
+        const statusMessage = document.getElementById('status-message');
+        if (statusMessage) {
+          statusMessage.textContent = "Time's up! A random vote has been cast.";
+        }
       }
     }
   }
@@ -1950,9 +2076,6 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     // Get the player index and raw color
     const playerIndex = getPlayerIndex(player.id);
     const playerColor = rawColors[playerIndex];
-    console.log(
-      `[COLOR_DEBUG] Player ${player.id} (${player.name}) - index ${playerIndex} - color ${playerColor}`,
-    );
 
     // Get first letter of name for avatar
     const firstLetter = player.name.charAt(0).toUpperCase();
