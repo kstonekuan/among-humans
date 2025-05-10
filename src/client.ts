@@ -1911,7 +1911,7 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     } else {
       // In game, show the player list header
       playerTitle.classList.remove('hidden');
-      playerTitle.textContent = 'Scoreboard';
+      playerTitle.textContent = 'Players';
       votesReceivedLabel.classList.remove('hidden');
     }
   }
@@ -1924,29 +1924,8 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     return;
   }
 
-  // First check if any player has a non-zero score to determine if scoring has started
-  const hasScoring = Object.values(serverPlayers).some((player) => player.score > 0);
-
-  // If scoring has started, sort by score but with some randomization for equal scores
-  // Otherwise, use a random order to make the AI player's position less predictable
-  const sortedPlayers = Object.values(serverPlayers).sort((a: Player, b: Player) => {
-    if (hasScoring) {
-      // If scores are different, sort by score (descending)
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      // If same score, randomize a bit by name
-      return a.name.localeCompare(b.name);
-    }
-    // Before scoring starts, use name-based sorting which is stable
-    // but still makes it hard to guess which is the AI
-    return a.name.localeCompare(b.name);
-  });
-
-  // Show rank numbers if scoring has started
-  let rank = 1;
-  let lastScore = -1;
-  let rankToShow = 1;
+  // Sort players alphabetically by name
+  const sortedPlayers = Object.values(serverPlayers).sort((a, b) => a.name.localeCompare(b.name));
 
   for (const player of sortedPlayers) {
     const playerItem = document.createElement('div');
@@ -1978,30 +1957,6 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     // Get first letter of name for avatar
     const firstLetter = player.name.charAt(0).toUpperCase();
 
-    // Calculate rank display
-    let rankDisplay = '';
-    if (hasScoring) {
-      // Update rank only if score changes
-      if (player.score !== lastScore) {
-        rankToShow = rank;
-        lastScore = player.score;
-      }
-
-      // Format rank with emoji for top 3
-      if (rankToShow === 1) {
-        rankDisplay = '🥇 ';
-      } else if (rankToShow === 2) {
-        rankDisplay = '🥈 ';
-      } else if (rankToShow === 3) {
-        rankDisplay = '🥉 ';
-      } else {
-        rankDisplay = `${rankToShow}. `;
-      }
-    }
-
-    // Increment rank counter
-    rank++;
-
     // Create player info container (left side)
     const playerInfoDiv = document.createElement('div');
     playerInfoDiv.style.display = 'flex';
@@ -2021,21 +1976,15 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     avatarDiv.style.marginRight = '0.75rem';
     avatarDiv.textContent = firstLetter;
 
-    // Add player name span
+    // Add player name span - no rank display
     const nameSpan = document.createElement('span');
-    nameSpan.innerHTML = `${rankDisplay}${player.name}${player.id === myPlayerId ? ' <span style="color: #2563eb;">(you)</span>' : ''}`;
+    nameSpan.innerHTML = `${player.name}${player.id === myPlayerId ? ' <span style="color: #2563eb;">(you)</span>' : ''}`;
 
-    // Create score container (right side)
-    const scoreDiv = document.createElement('div');
-    scoreDiv.style.display = 'flex';
-    scoreDiv.style.flexDirection = 'row';
-    scoreDiv.style.alignItems = 'center';
-    scoreDiv.style.gap = '0.5rem';
-
-    // Score span
-    const scoreSpan = document.createElement('span');
-    scoreSpan.style.fontWeight = '600';
-    scoreSpan.textContent = player.score.toString();
+    // Create vote counter container (right side)
+    const voteDiv = document.createElement('div');
+    voteDiv.style.display = 'flex';
+    voteDiv.style.flexDirection = 'row';
+    voteDiv.style.alignItems = 'center';
 
     // Vote counter
     const voteCounterSpan = document.createElement('span');
@@ -2051,11 +2000,10 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     playerInfoDiv.appendChild(avatarDiv);
     playerInfoDiv.appendChild(nameSpan);
 
-    scoreDiv.appendChild(scoreSpan);
-    scoreDiv.appendChild(voteCounterSpan);
+    voteDiv.appendChild(voteCounterSpan);
 
     playerItem.appendChild(playerInfoDiv);
-    playerItem.appendChild(scoreDiv);
+    playerItem.appendChild(voteDiv);
 
     // Add to player list
     playerList.appendChild(playerItem);
