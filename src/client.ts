@@ -50,6 +50,7 @@ interface VoteResults {
 interface RoomData {
   roomCode: string;
   player: Player;
+  isReconnection?: boolean;
 }
 
 interface GameComplete {
@@ -212,32 +213,40 @@ function getUrlParameter(name: string): string | null {
   return urlParams.get(name);
 }
 
-// Function to update URL with room code
-function updateUrlWithRoomCode(roomCode: string): void {
+// Function to update URL with room code and player name
+function updateUrlWithRoomCode(roomCode: string, playerName?: string): void {
   // Create a new URL object based on the current URL
   const url = new URL(window.location.href);
 
   // Set the room parameter
   url.searchParams.set('room', roomCode);
 
+  // If player name is provided, add it to the URL
+  if (playerName) {
+    url.searchParams.set('player', playerName);
+  }
+
   // Update the URL without reloading the page
   window.history.pushState({}, '', url.toString());
 
-  console.log(`URL updated with room code: ${roomCode}`);
+  console.log(
+    `URL updated with room code: ${roomCode}${playerName ? ` and player name: ${playerName}` : ''}`,
+  );
 }
 
-// Function to clear room code from URL
+// Function to clear room code and player name from URL
 function clearRoomCodeFromUrl(): void {
   // Create a new URL object based on the current URL
   const url = new URL(window.location.href);
 
-  // Remove the room parameter
+  // Remove the room and player parameters
   url.searchParams.delete('room');
+  url.searchParams.delete('player');
 
   // Update the URL without reloading the page
   window.history.pushState({}, '', url.toString());
 
-  console.log('Room code cleared from URL');
+  console.log('Room code and player name cleared from URL');
 }
 
 // Connect to server when page loads
@@ -257,13 +266,22 @@ document.addEventListener('DOMContentLoaded', () => {
       statusMessage.textContent = 'Create a new room or join an existing one!';
     }
 
-    // Check if room code is in URL parameters
+    // Check if room code and player name are in URL parameters
     const roomCode = getUrlParameter('room');
-    if (roomCode) {
-      console.log(`Found room code in URL: ${roomCode}`);
+    const playerName = getUrlParameter('player');
 
-      // Attempt to join the room directly using the socket
-      socket.emit('join_room', roomCode);
+    if (roomCode) {
+      console.log(
+        `Found room code in URL: ${roomCode}${playerName ? `, player name: ${playerName}` : ''}`,
+      );
+
+      // Attempt to join the room with player name if available (for reconnection)
+      if (playerName) {
+        socket.emit('join_room', { roomCode, playerName });
+      } else {
+        // Just use room code for a fresh join
+        socket.emit('join_room', roomCode);
+      }
 
       // Also update the input field in case the join fails and we need to show the UI
       const roomCodeInput = document.getElementById('room-code-input') as HTMLInputElement;
@@ -310,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Handle room joined event
-  socket.on('room_joined', (data: RoomData) => {
+  socket.on('room_joined', (data: RoomData & { isReconnection?: boolean }) => {
     // Reset color assignments for the new room
     resetColorAssignments();
 
@@ -319,7 +337,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show success message
     const statusMessage = document.getElementById('status-message');
     if (statusMessage) {
-      statusMessage.textContent = 'Room joined! Waiting for the game to start...';
+      if (data.isReconnection) {
+        statusMessage.textContent = 'Successfully reconnected to room!';
+      } else {
+        statusMessage.textContent = 'Room joined! Waiting for the game to start...';
+      }
     }
   });
 
@@ -374,6 +396,12 @@ document.addEventListener('DOMContentLoaded', () => {
   socket.on('show_config_ui', (data: { isFirstGame: boolean }) => {
     const startButton = document.getElementById('start-round-button') as HTMLButtonElement;
     const roundConfig = document.getElementById('round-config');
+    const exitRoomButton = document.getElementById('exit-room-button');
+
+    // Show the exit room button again during setup phase
+    if (exitRoomButton) {
+      exitRoomButton.classList.remove('hidden');
+    }
 
     if (startButton && roundConfig) {
       // Set the appropriate button text based on the game state
@@ -437,6 +465,8 @@ document.addEventListener('DOMContentLoaded', () => {
         answerArea.classList.remove('hidden');
       }
 
+      // Exit room button remains visible during gameplay
+
       // Display the prompt
       const promptArea = document.getElementById('prompt-area');
       if (promptArea) {
@@ -482,25 +512,39 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.emit('request_players_update');
       }
 
+      // Check if this is a normal challenge or a reconnection
+      const isReconnection = data.duration === 0;
+
       // Show and enable the input and submit button
       const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
       const submitButton = document.getElementById('submit-answer-button') as HTMLButtonElement;
 
       if (answerInput && submitButton) {
+        // Always make elements visible
         answerInput.classList.remove('hidden');
-        answerInput.value = '';
-        answerInput.disabled = false;
-
         submitButton.classList.remove('hidden');
-        submitButton.disabled = false;
+
+        if (!isReconnection) {
+          // Normal challenge - enable input
+          answerInput.value = '';
+          answerInput.disabled = false;
+          submitButton.disabled = false;
+        } else {
+          // Reconnection - the server will tell us if we've already answered
+          // Keep them disabled until we receive status update
+          answerInput.disabled = true;
+          submitButton.disabled = true;
+        }
       }
 
-      // Clear previous results
-      clearElementContent('public-answers-area');
-      clearElementContent('voting-area');
+      // Only clear previous results for new challenges (not reconnections)
+      if (!isReconnection) {
+        clearElementContent('public-answers-area');
+        clearElementContent('voting-area');
 
-      // Set up the challenge phase
-      setGamePhase(data.duration, 'Answer the question when ready.');
+        // Set up the challenge phase with timer if it's a new challenge
+        setGamePhase(data.duration, 'Answer the question when ready.');
+      }
     },
   );
 
@@ -509,6 +553,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusMessage = document.getElementById('status-message');
     if (statusMessage) {
       statusMessage.textContent = message;
+    }
+
+    // Handle special status messages for reconnection cases
+    if (message === 'You already submitted an answer. Waiting for others...') {
+      // Disable answer input since this player has already answered
+      const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
+      const submitButton = document.getElementById('submit-answer-button') as HTMLButtonElement;
+
+      if (answerInput && submitButton) {
+        answerInput.disabled = true;
+        submitButton.disabled = true;
+        submitButton.classList.add('hidden');
+      }
+    } else if (message === 'Vote cast! Waiting for results...') {
+      // When reconnecting during voting phase, ensure we show the player has already voted
+      const answerCards = document.querySelectorAll('.answer-card');
+      for (const card of Array.from(answerCards)) {
+        card.classList.remove('vote-enabled');
+        (card as HTMLElement).style.cursor = 'default';
+      }
     }
   });
 
@@ -1673,8 +1737,8 @@ function handleRoomJoined(data: RoomData): void {
   myRoomCode = roomCode;
   myPlayerId = player.id;
 
-  // Update URL with room code
-  updateUrlWithRoomCode(roomCode);
+  // Update URL with room code and player name for reconnection
+  updateUrlWithRoomCode(roomCode, player.name);
 
   // Hide room selection area and game description
   const roomSelectionArea = document.getElementById('room-selection-area');
@@ -1698,24 +1762,22 @@ function handleRoomJoined(data: RoomData): void {
     roomInfoArea.classList.remove('hidden');
     roomCodeDisplay.textContent = roomCode;
 
-    // Add click-to-copy functionality (copy both room code and full URL)
+    // Add click-to-copy functionality to copy just the room code
     roomCodeDisplay.addEventListener('click', async () => {
       try {
-        // Copy full URL with room code for easy sharing
-        const shareUrl = new URL(window.location.href);
-        shareUrl.searchParams.set('room', roomCode);
-        await navigator.clipboard.writeText(shareUrl.toString());
+        // Copy just the room code itself
+        await navigator.clipboard.writeText(roomCode);
 
         // Show temporary success feedback
         const originalContent = roomCodeDisplay.textContent;
-        roomCodeDisplay.textContent = 'Copied URL!';
+        roomCodeDisplay.textContent = 'Copied!';
 
         // Reset after a short delay
         setTimeout(() => {
           roomCodeDisplay.textContent = originalContent;
         }, 1000);
       } catch (err) {
-        console.error('Failed to copy room code URL:', err);
+        console.error('Failed to copy room code:', err);
       }
     });
   }
@@ -1830,6 +1892,55 @@ function setupEventListeners(): void {
 
         if (gameDescription) {
           gameDescription.classList.remove('hidden');
+        }
+
+        // Reset input fields for a fresh experience when creating a new room
+        // Reset and re-enable AI imposter prompt input
+        const aiImposterPrompt = document.getElementById(
+          'ai-imposter-prompt',
+        ) as HTMLTextAreaElement;
+        const submitImposterPromptButton = document.getElementById(
+          'submit-imposter-prompt',
+        ) as HTMLButtonElement;
+        if (aiImposterPrompt && submitImposterPromptButton) {
+          aiImposterPrompt.value = '';
+          aiImposterPrompt.disabled = false;
+          submitImposterPromptButton.disabled = false;
+          submitImposterPromptButton.classList.remove('opacity-50');
+          submitImposterPromptButton.textContent = 'Submit Your Influence';
+
+          // Remove any previously added note about submission
+          const promptContainer = aiImposterPrompt.closest('div');
+          if (promptContainer?.parentNode) {
+            const existingNote = promptContainer.parentNode.querySelector('.text-green-600');
+            if (existingNote) {
+              existingNote.remove();
+            }
+          }
+        }
+
+        // Reset and re-enable custom question input
+        const customQuestionInput = document.getElementById(
+          'custom-question-input',
+        ) as HTMLTextAreaElement;
+        const submitCustomQuestionButton = document.getElementById(
+          'submit-custom-question',
+        ) as HTMLButtonElement;
+        if (customQuestionInput && submitCustomQuestionButton) {
+          customQuestionInput.value = '';
+          customQuestionInput.disabled = false;
+          submitCustomQuestionButton.disabled = false;
+          submitCustomQuestionButton.classList.remove('opacity-50');
+          submitCustomQuestionButton.textContent = 'Submit Topic Ideas';
+
+          // Remove any previously added note about submission
+          const questionContainer = customQuestionInput.closest('div');
+          if (questionContainer?.parentNode) {
+            const existingNote = questionContainer.parentNode.querySelector('.text-green-600');
+            if (existingNote) {
+              existingNote.remove();
+            }
+          }
         }
 
         // Update status message

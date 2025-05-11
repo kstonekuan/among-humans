@@ -43,6 +43,7 @@ type Player = {
   hasVotedThisRound?: boolean;
   roomCode?: string;
   customQuestion?: string;
+  isActive?: boolean; // Flag to track if player is currently connected
 };
 
 type Answer = {
@@ -558,31 +559,37 @@ io.on('connection', (socket) => {
         room.aiPlayerActive = false;
       }
 
-      // Remove player from the room
-      delete room.players[socket.id];
+      // Mark player as inactive instead of removing them
+      if (room.players[socket.id]) {
+        room.players[socket.id].isActive = false;
+        console.log(
+          `[ROOM] Player ${socket.id} (${room.players[socket.id].name}) marked as inactive in room ${room.code}`,
+        );
+      }
 
       // Leave socket.io room
       socket.leave(room.code);
 
-      // If room is empty, remove it
-      if (Object.keys(room.players).length === 0) {
+      // Check if all players are inactive
+      const allPlayersInactive = Object.values(room.players).every(
+        (player) => player.isAI || player.isActive === false,
+      );
+
+      // If all players are inactive, remove the room
+      if (allPlayersInactive && Object.keys(room.players).length > 0) {
         delete rooms[room.code];
-        console.log(`[ROOM] Room ${room.code} removed because it's empty`);
+        console.log(`[ROOM] Room ${room.code} removed because all players are inactive`);
         console.log(`[ROOMS] Total active rooms: ${Object.keys(rooms).length}`);
       } else {
         // Notify all clients in the room about player list update
         io.to(room.code).emit('update_players', getFilteredPlayersForClient(room));
 
-        // If game was in progress, end it
+        // If game was in progress, pause it (but don't end it)
         if (room.gameState !== 'waiting') {
-          room.gameState = 'waiting';
-          io.to(room.code).emit('status_update', 'Game ended because a player left');
-
-          // Show configuration UI to all remaining players
-          io.to(room.code).emit('show_config_ui', { isFirstGame: !room.isGameStarted });
-
-          // All remaining players can start the game
-          io.to(room.code).emit('enable_start_button');
+          io.to(room.code).emit(
+            'status_update',
+            'Player disconnected. Waiting for reconnection...',
+          );
         }
       }
     }
@@ -724,7 +731,18 @@ io.on('connection', (socket) => {
   });
 
   // Handle join room
-  socket.on('join_room', (roomCode: string) => {
+  socket.on('join_room', (data: string | { roomCode: string; playerName?: string }) => {
+    // Handle both string (roomCode only) and object (with playerName) formats
+    let roomCode: string;
+    let requestedPlayerName: string | undefined;
+
+    if (typeof data === 'string') {
+      roomCode = data;
+    } else {
+      roomCode = data.roomCode;
+      requestedPlayerName = data.playerName;
+    }
+
     // Validate room code
     if (!rooms[roomCode]) {
       socket.emit('room_error', 'Room not found');
@@ -733,48 +751,259 @@ io.on('connection', (socket) => {
 
     const room = rooms[roomCode];
 
-    // Don't allow joining if game in progress
-    if (room.gameState !== 'waiting') {
+    // Don't allow joining if game in progress and this is a new player (not reconnecting)
+    if (room.gameState !== 'waiting' && !requestedPlayerName) {
       socket.emit('room_error', 'Game in progress, try again later');
       return;
     }
 
-    // Get a list of player names already used in this room
-    const usedNames: string[] = Object.values(room.players).map((player) => player.name);
-    // Assign a random name to the player that isn't already in use
-    const randomName = getRandomPlayerName(usedNames);
+    let player: Player;
+    let isReconnection = false;
 
-    // Create new player
-    const newPlayer = {
-      id: socket.id,
-      name: randomName,
-      score: 0,
-      isAI: false,
-      isReady: false,
-      roomCode,
-    };
+    // Check if this is a reconnection attempt
+    if (requestedPlayerName) {
+      // Look for an inactive player with this name
+      const inactivePlayer = Object.values(room.players).find(
+        (p) => p.name === requestedPlayerName && p.isActive === false,
+      );
 
-    // Add player to room
-    room.players[socket.id] = newPlayer;
+      if (inactivePlayer) {
+        // This is a reconnection - replace the player ID with the new socket ID
+        const oldPlayerId = inactivePlayer.id;
+
+        // Create a copy of the player with the new socket ID
+        player = {
+          ...inactivePlayer,
+          id: socket.id,
+          isActive: true,
+        };
+
+        // Remove the old player entry and add the new one
+        delete room.players[oldPlayerId];
+        room.players[socket.id] = player;
+
+        // If there's an active round, update the participant list with the new socket ID
+        if (room.gameState !== 'waiting' && room.currentRoundData.participants) {
+          // Check if the old player ID is in the participants list
+          if (room.currentRoundData.participants[oldPlayerId]) {
+            // Copy the participant data to the new player ID
+            room.currentRoundData.participants[socket.id] = {
+              ...room.currentRoundData.participants[oldPlayerId],
+              id: socket.id,
+            };
+
+            // Remove the old player ID from participants
+            delete room.currentRoundData.participants[oldPlayerId];
+          }
+
+          // If there are answers, update those too
+          if (room.currentRoundData.answers?.[oldPlayerId]) {
+            room.currentRoundData.answers[socket.id] = {
+              ...room.currentRoundData.answers[oldPlayerId],
+              playerId: socket.id,
+            };
+
+            delete room.currentRoundData.answers[oldPlayerId];
+          }
+
+          // If there are votes, update those too
+          if (room.currentRoundData.currentVotes) {
+            // Update votes cast by this player
+            if (room.currentRoundData.currentVotes[oldPlayerId]) {
+              room.currentRoundData.currentVotes[socket.id] =
+                room.currentRoundData.currentVotes[oldPlayerId];
+              delete room.currentRoundData.currentVotes[oldPlayerId];
+            }
+
+            // Update votes for this player
+            for (const voterId in room.currentRoundData.currentVotes) {
+              if (room.currentRoundData.currentVotes[voterId] === oldPlayerId) {
+                room.currentRoundData.currentVotes[voterId] = socket.id;
+              }
+            }
+          }
+        }
+
+        // Mark as reconnection
+        isReconnection = true;
+
+        console.log(
+          `[ROOM] Player ${requestedPlayerName} (${socket.id}) reconnected to room ${roomCode}`,
+        );
+      } else {
+        // Check if the name is already taken by an active player
+        const isNameTaken = Object.values(room.players).some(
+          (p) => p.name === requestedPlayerName && p.isActive !== false,
+        );
+
+        if (isNameTaken) {
+          // Can't use this name, it's taken by an active player
+          // Assign a random name instead
+          const usedNames: string[] = Object.values(room.players).map((p) => p.name);
+          const randomName = getRandomPlayerName(usedNames);
+
+          player = {
+            id: socket.id,
+            name: randomName,
+            score: 0,
+            isAI: false,
+            isReady: false,
+            roomCode,
+            isActive: true,
+          };
+
+          console.log(
+            `[ROOM] Player ${socket.id} couldn't reconnect as ${requestedPlayerName} (name taken), joined as ${randomName}`,
+          );
+        } else {
+          // Name is available, create a new player with the requested name
+          player = {
+            id: socket.id,
+            name: requestedPlayerName,
+            score: 0,
+            isAI: false,
+            isReady: false,
+            roomCode,
+            isActive: true,
+          };
+
+          console.log(`[ROOM] Player ${socket.id} joined as ${requestedPlayerName}`);
+        }
+      }
+    } else {
+      // Standard join with random name
+      const usedNames: string[] = Object.values(room.players).map((p) => p.name);
+      const randomName = getRandomPlayerName(usedNames);
+
+      player = {
+        id: socket.id,
+        name: randomName,
+        score: 0,
+        isAI: false,
+        isReady: false,
+        roomCode,
+        isActive: true,
+      };
+
+      console.log(`[ROOM] Player ${socket.id} joined as ${randomName}`);
+    }
+
+    // Add player to room if not already done in reconnection
+    if (!isReconnection) {
+      room.players[socket.id] = player;
+    }
 
     // Join socket.io room
     socket.join(roomCode);
 
-    // Log player joining room
-    console.log(`[ROOM] Player ${socket.id} joined room ${roomCode}`);
+    // Log player count
     console.log(`[ROOM] Room ${roomCode} now has ${Object.keys(room.players).length} players`);
 
-    // Emit room joined event
+    // Emit room joined event with a flag indicating if it's a reconnection
     socket.emit('room_joined', {
       roomCode,
-      player: newPlayer,
+      player,
+      isReconnection,
     });
 
     // Notify room about player list update
     io.to(roomCode).emit('update_players', getFilteredPlayersForClient(room));
 
-    // Show configuration UI to the newly joined player
-    if (room.gameState === 'waiting') {
+    // For reconnections during a game, need to catch them up
+    if (isReconnection && room.gameState !== 'waiting') {
+      // Send current game state to reconnected player
+      socket.emit('status_update', 'Welcome back! Rejoining the game in progress...');
+
+      // First, send the current round information to ensure UI displays correctly
+      if (room.currentRound > 0 && room.totalRounds > 0) {
+        socket.emit('rounds_set', room.totalRounds);
+        socket.emit('disable_rounds_input', room.totalRounds);
+      }
+
+      // If in challenge phase, send the current prompt
+      if (room.gameState === 'challenge' && room.currentRoundData.prompt) {
+        socket.emit('start_challenge', {
+          prompt: room.currentRoundData.prompt,
+          duration: 0, // Duration of 0 prevents timer issues
+          currentRound: room.currentRound,
+          totalRounds: room.totalRounds,
+        });
+
+        // Also send player update to ensure all players are visible
+        socket.emit('update_players', getFilteredPlayersForClient(room));
+
+        // If the player has already answered in this round, disable the answer input
+        if (room.currentRoundData.answers[socket.id]) {
+          socket.emit('status_update', 'You already submitted an answer. Waiting for others...');
+        }
+      }
+      // If in results phase, send the current answers
+      else if (room.gameState === 'results' && room.currentRoundData.answers) {
+        // First send the challenge information to set up the UI
+        socket.emit('start_challenge', {
+          prompt: room.currentRoundData.prompt || 'Round in progress...',
+          duration: 0,
+          currentRound: room.currentRound,
+          totalRounds: room.totalRounds,
+        });
+
+        // Collect answers to resend
+        const formattedAnswers = Object.values(room.currentRoundData.participants).map(
+          (participant) => {
+            const answer = room.currentRoundData.answers[participant.id];
+            return {
+              name: participant.name,
+              answer: answer ? answer.answer : '',
+            };
+          },
+        );
+
+        // Then send the answers that have been collected
+        socket.emit('show_public_answers', formattedAnswers);
+
+        // Update player list
+        socket.emit('update_players', getFilteredPlayersForClient(room));
+      }
+      // If in voting phase, send voting data
+      else if (room.gameState === 'voting') {
+        // First send the challenge information to set up the UI
+        socket.emit('start_challenge', {
+          prompt: room.currentRoundData.prompt || 'Round in progress...',
+          duration: 0,
+          currentRound: room.currentRound,
+          totalRounds: room.totalRounds,
+        });
+
+        // Then send answers
+        const formattedAnswers = Object.values(room.currentRoundData.participants).map(
+          (participant) => {
+            const answer = room.currentRoundData.answers[participant.id];
+            return {
+              name: participant.name,
+              answer: answer ? answer.answer : '',
+            };
+          },
+        );
+        socket.emit('show_public_answers', formattedAnswers);
+
+        // Finally, start voting phase
+        socket.emit('start_voting', {
+          participants: room.currentRoundData.participants,
+          aiPlayer: { id: room.aiPlayerId, name: room.currentAiPlayerName },
+          duration: 0, // No timer
+        });
+
+        // If player has already voted, update status
+        if (room.players[socket.id]?.hasVotedThisRound) {
+          socket.emit('status_update', 'Vote cast! Waiting for results...');
+        }
+
+        // Update player list
+        socket.emit('update_players', getFilteredPlayersForClient(room));
+      }
+    }
+    // Show configuration UI to the newly joined player if game hasn't started
+    else if (room.gameState === 'waiting') {
       socket.emit('show_config_ui', { isFirstGame: !room.isGameStarted });
       // All players can start the game
       socket.emit('enable_start_button');
