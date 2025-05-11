@@ -1104,7 +1104,7 @@ io.on('connection', (socket) => {
   });
 
   // Handle player submitting an answer
-  socket.on('submit_answer', (data: { answer: string; timeSpent: number }) => {
+  socket.on('submit_answer', (data: { answer: string }) => {
     // Find player's room
     const room = getRoomFromPlayerId(socket.id);
     if (!room) return;
@@ -1122,7 +1122,6 @@ io.on('connection', (socket) => {
     const answerData = {
       playerId: socket.id,
       answer: data.answer,
-      timeSpent: data.timeSpent,
     };
 
     // Store in current round data
@@ -1170,7 +1169,6 @@ io.on('connection', (socket) => {
             const fallbackAnswer = {
               playerId: room.aiPlayerId,
               answer: 'Sorry, I was distracted. What was the question again?',
-              timeSpent: 1000, // Very short time since we're answering immediately
             };
 
             // Store in current round data
@@ -1497,14 +1495,14 @@ async function generateAndSubmitAIAnswer(room: Room, gamePrompt: string | null):
           room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
         }
 
-        console.log(`[ROOM] AI answer submitted immediately for room ${room.code}`);
+        console.log(`[ROOM] AI answer submitted for room ${room.code}`);
       }
     } else {
       // Handle error case
       throw new Error('Failed to generate AI answer');
     }
   } catch (error) {
-    console.error('Error generating immediate AI answer:', error);
+    console.error('Error generating AI answer:', error);
     throw error; // Let the caller handle the error
   }
 }

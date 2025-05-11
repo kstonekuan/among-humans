@@ -75,7 +75,6 @@ interface GameComplete {
       {
         playerId: string;
         answer: string;
-        timeSpent: number;
       }
     >;
   }>;
@@ -1552,7 +1551,6 @@ document.addEventListener('DOMContentLoaded', () => {
           type AnswerType = {
             playerId: string;
             answer: string;
-            timeSpent: number;
           };
 
           // Sort answers by player name for consistent display
@@ -1563,7 +1561,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 playerName: players[typedAnswer.playerId]?.name || 'Unknown Player',
                 isAI: typedAnswer.playerId === aiPlayer.id,
                 answer: typedAnswer.answer,
-                timeSpent: typedAnswer.timeSpent,
                 playerId: typedAnswer.playerId,
               };
             })
