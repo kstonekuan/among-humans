@@ -1291,7 +1291,6 @@ document.addEventListener('DOMContentLoaded', () => {
       playerVotesReceived,
       aiPlayer,
       players,
-      combinedImposterPrompt,
       playerImposterPrompts,
     } = data;
 
@@ -1425,24 +1424,6 @@ document.addEventListener('DOMContentLoaded', () => {
     aiExplanation.textContent = `The AI imposter (${aiPlayer.name}) was instructed to answer questions while trying to blend in with human players.`;
     imposterSection.appendChild(aiExplanation);
 
-    // Show combined imposter prompt if available
-    if (combinedImposterPrompt) {
-      const combinedPromptDiv = document.createElement('div');
-      combinedPromptDiv.className = 'mb-4 p-3 bg-white rounded border border-gray-200';
-
-      const combinedPromptTitle = document.createElement('h4');
-      combinedPromptTitle.className = 'font-semibold mb-2';
-      combinedPromptTitle.textContent = 'Combined Instructions:';
-      combinedPromptDiv.appendChild(combinedPromptTitle);
-
-      const combinedPromptText = document.createElement('p');
-      combinedPromptText.className = 'text-sm italic';
-      combinedPromptText.textContent = combinedImposterPrompt;
-      combinedPromptDiv.appendChild(combinedPromptText);
-
-      imposterSection.appendChild(combinedPromptDiv);
-    }
-
     // Show individual player instructions
     if (playerImposterPrompts && Object.keys(playerImposterPrompts).length > 0) {
       const playerPromptSection = document.createElement('div');
@@ -1453,14 +1434,8 @@ document.addEventListener('DOMContentLoaded', () => {
       playerPromptTitle.textContent = 'Individual Player Instructions:';
       playerPromptSection.appendChild(playerPromptTitle);
 
-      // Create a collapsible section
-      const playerPromptToggle = document.createElement('button');
-      playerPromptToggle.className = 'text-blue-500 hover:text-blue-700 mb-2 text-sm font-semibold';
-      playerPromptToggle.textContent = 'Show Individual Instructions';
-      playerPromptSection.appendChild(playerPromptToggle);
-
       const playerPromptContent = document.createElement('div');
-      playerPromptContent.className = 'hidden space-y-2';
+      playerPromptContent.className = 'space-y-2';
 
       // Sort entries by player name
       const sortedPrompts = Object.entries(playerImposterPrompts)
@@ -1490,15 +1465,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       playerPromptSection.appendChild(playerPromptContent);
       imposterSection.appendChild(playerPromptSection);
-
-      // Add toggle functionality
-      playerPromptToggle.addEventListener('click', () => {
-        const isHidden = playerPromptContent.classList.contains('hidden');
-        playerPromptContent.classList.toggle('hidden', !isHidden);
-        playerPromptToggle.textContent = isHidden
-          ? 'Hide Individual Instructions'
-          : 'Show Individual Instructions';
-      });
     }
 
     resultsContainer.appendChild(imposterSection);
