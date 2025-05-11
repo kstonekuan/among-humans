@@ -1002,8 +1002,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Timer setting events removed
-
   // Handle loading indicator for all players when any player starts the game
   socket.on('loading_game', () => {
     // Show loading indicator on start button for all players
@@ -1863,8 +1861,6 @@ function setupEventListeners(): void {
       }
     });
   }
-
-  // Timer setting event handlers removed
 }
 
 // Game phase transition code

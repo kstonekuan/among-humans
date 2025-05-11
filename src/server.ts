@@ -1,7 +1,7 @@
-import http from 'node:http';
-import path from 'node:path';
 import dotenv from 'dotenv';
 import express from 'express';
+import http from 'node:http';
+import path from 'node:path';
 import OpenAI from 'openai';
 import { Server } from 'socket.io';
 import { extractTextFromResponse } from './openai-patch';
@@ -739,8 +739,6 @@ io.on('connection', (socket) => {
         socket.emit('rounds_set', room.totalRounds);
         socket.emit('disable_rounds_input', room.totalRounds);
       }
-
-      // Timer settings removed
     }
   });
 
