@@ -1,3 +1,5 @@
+<img src="https://github.com/user-attachments/assets/41480939-e340-4370-9e21-510f58ac29cb" width="200" height="200">
+
 # AmongHumans
 
 **A Real-Time Multiplayer Social Deduction Game**
