@@ -2,7 +2,7 @@
 
 **A Real-Time Multiplayer Social Deduction Game**
 
-**Play now: [https://among-humans-io.onrender.com/](https://among-humans-io.onrender.com/)**
+**Play now: [https://among-humans.onrender.com/](https://among-humans.onrender.com/)**
 
 ---
 
