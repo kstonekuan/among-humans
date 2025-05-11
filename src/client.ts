@@ -1768,8 +1768,10 @@ function handleRoomJoined(data: RoomData): void {
         // Copy just the room code itself
         await navigator.clipboard.writeText(roomCode);
 
-        // Show temporary success feedback
+        // Store original content before changing it
         const originalContent = roomCodeDisplay.textContent;
+
+        // Show temporary success feedback
         roomCodeDisplay.textContent = 'Copied!';
 
         // Reset after a short delay
