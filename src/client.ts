@@ -274,6 +274,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (statusMessage) {
       statusMessage.textContent = 'Room created! Waiting for players to join...';
     }
+
+    // Hide GitHub link when creating a room
+    const githubLink = document.getElementById('github-link');
+    if (githubLink) {
+      githubLink.classList.add('hidden');
+    }
   });
 
   // Handle room joined event
@@ -291,6 +297,12 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         statusMessage.textContent = 'Room joined! Waiting for the game to start...';
       }
+    }
+
+    // Hide GitHub link when joining a room
+    const githubLink = document.getElementById('github-link');
+    if (githubLink) {
+      githubLink.classList.add('hidden');
     }
   });
 
@@ -1880,6 +1892,12 @@ function setupEventListeners(): void {
         if (statusMessage) {
           statusMessage.textContent =
             'You have left the room. Create a new room or join an existing one!';
+        }
+
+        // Show GitHub link again when exiting a room
+        const githubLink = document.getElementById('github-link');
+        if (githubLink) {
+          githubLink.classList.remove('hidden');
         }
       }
     });

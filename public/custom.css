@@ -845,6 +845,29 @@ input[type="reset"],
   animation: shake 0.5s ease-in-out;
 }
 
+/* GitHub link styling */
+.github-link {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  background-color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  z-index: 10;
+  border: 2px solid var(--pastel-lavender);
+}
+
+.github-link:hover {
+  transform: translateY(-5px) rotate(5deg);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+}
+
 @keyframes shake {
   0%,
   100% {
