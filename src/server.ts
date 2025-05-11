@@ -521,6 +521,13 @@ function startRound(room: Room): void {
   room.currentRoundData.participants = {};
   room.currentRoundData.currentVotes = {};
 
+  // Create a new entry in roundsHistory for the current round
+  room.roundsHistory.push({
+    roundNumber: room.currentRound,
+    prompt: room.currentRoundData.prompt || '',
+    answers: {},
+  });
+
   // Add all active players to the current round participants
   for (const playerId in room.players) {
     // Create a shallow copy of player for current round
