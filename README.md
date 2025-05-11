@@ -1,4 +1,4 @@
-# AmongHumans.io
+# AmongHumans
 
 **A Real-Time Multiplayer Social Deduction Game**
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-AmongHumans.io is a web-based multiplayer game where human players interact in a chat-like environment to identify a hidden AI player ("Imposter") among them. Players submit text answers to creative prompts each round. What makes it unique:
+AmongHumans is a web-based multiplayer game where human players interact in a chat-like environment to identify a hidden AI player ("Imposter") among them. Players submit text answers to creative prompts each round. What makes it unique:
 
 1.  **Player-Influenced AI:** Players can submit instructions to influence how the AI behaves, making each game unique and challenging.
 2.  **Dynamic AI Player:** The AI opponent generates its answers using an LLM, gets a "vibe-based" name to blend in, and votes strategically based on heuristics.
@@ -49,6 +49,8 @@ Can you outsmart the AI player? Or can you fool everyone into thinking *you're* 
 *   **Player-Generated Questions:** Suggest topics for the game to create custom question prompts.
 
 ## Tech Stack
+
+Note: This codebase was largely generated with [Claude Code](https://www.anthropic.com/claude-code) 
 
 *   **Backend:** Node.js, Express.js, TypeScript
 *   **Real-time Communication:** Socket.IO

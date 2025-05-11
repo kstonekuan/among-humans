@@ -88,8 +88,6 @@ type Room = {
   currentRound: number;
   roundsCompleted: boolean;
 
-  // Game phase durations
-
   // Track votes across rounds
   allRoundsVotes: Array<{
     roundNumber: number;
@@ -472,7 +470,7 @@ function startGame(room: Room): void {
 
   // Check if this is the first round/game start
   if (!room.isGameStarted) {
-    // Mark the game as started (no longer reassigning names)
+    // Mark the game as started
     room.isGameStarted = true;
 
     // Log that the game has started
@@ -683,8 +681,6 @@ io.on('connection', (socket) => {
       totalRounds: 3, // Default to 3 rounds
       currentRound: 0,
       roundsCompleted: false,
-
-      // Use default game durations
 
       // Initialize empty tracking arrays/objects
       allRoundsVotes: [],
@@ -936,7 +932,6 @@ io.on('connection', (socket) => {
       if (room.gameState === 'challenge' && room.currentRoundData.prompt) {
         socket.emit('start_challenge', {
           prompt: room.currentRoundData.prompt,
-          duration: 0, // Duration of 0 prevents timer issues
           currentRound: room.currentRound,
           totalRounds: room.totalRounds,
         });
@@ -957,7 +952,6 @@ io.on('connection', (socket) => {
         // First send the challenge information to set up the UI
         socket.emit('start_challenge', {
           prompt: room.currentRoundData.prompt || 'Round in progress...',
-          duration: 0,
           currentRound: room.currentRound,
           totalRounds: room.totalRounds,
         });
@@ -984,7 +978,6 @@ io.on('connection', (socket) => {
         // First send the challenge information to set up the UI
         socket.emit('start_challenge', {
           prompt: room.currentRoundData.prompt || 'Round in progress...',
-          duration: 0,
           currentRound: room.currentRound,
           totalRounds: room.totalRounds,
         });
@@ -1005,7 +998,6 @@ io.on('connection', (socket) => {
         socket.emit('start_voting', {
           participants: room.currentRoundData.participants,
           aiPlayer: { id: room.aiPlayerId, name: room.currentAiPlayerName },
-          duration: 0, // No timer
         });
 
         // If player has already voted, update status and send which player they voted for
@@ -1683,7 +1675,6 @@ function startVotingPhase(room: Room): void {
   io.to(room.code).emit('start_voting', {
     participants: room.currentRoundData.participants,
     aiPlayer: { id: room.aiPlayerId, name: room.currentAiPlayerName },
-    duration: 0, // Duration no longer needed
   });
 
   // AI will vote when last human votes

@@ -21,7 +21,6 @@ interface PublicAnswer {
 interface VoteData {
   participants: Record<string, Player>;
   aiPlayer: Player;
-  duration?: number; // Duration for voting in milliseconds
 }
 
 interface VoteResults {
@@ -94,58 +93,11 @@ type Socket = {
 let socket: Socket;
 let myPlayerId = '';
 let myRoomCode = ''; // Will store the current room code
-let roundEndTime = 0; // For calculating time spent on answers
 let playerVotesReceived: Record<string, number> = {}; // Track votes received by each player
 const currentPlayers: Record<string, Player> = {}; // Store current players to look up player IDs
 
 // Track player colors for the current room
 const playerColors: Record<string, string> = {};
-
-// We're no longer using Tailwind colors, but keeping this for reference
-// Commented out to avoid linting errors
-/*
-const availableColors = [
-  'bg-red-500',
-  'bg-blue-500',
-  'bg-green-500',
-  'bg-yellow-500',
-  'bg-purple-500',
-  'bg-cyan-500',
-  'bg-orange-500',
-  'bg-pink-500',
-  'bg-lime-500',
-  'bg-indigo-500',
-  'bg-emerald-500',
-  'bg-violet-500',
-  'bg-amber-500',
-  'bg-teal-500',
-  'bg-rose-500',
-  'bg-fuchsia-500',
-];
-*/
-
-// We're now using direct color values, but keeping this for reference
-// Commented out to avoid linting errors
-/*
-const colorMap: Record<string, string> = {
-  'bg-purple-500': '#8b5cf6',
-  'bg-blue-500': '#3b82f6',
-  'bg-green-500': '#10b981',
-  'bg-yellow-500': '#eab308',
-  'bg-pink-500': '#ec4899',
-  'bg-indigo-500': '#6366f1',
-  'bg-red-500': '#ef4444',
-  'bg-orange-500': '#f97316',
-  'bg-cyan-500': '#06b6d4',
-  'bg-emerald-500': '#10b981',
-  'bg-violet-500': '#8b5cf6',
-  'bg-rose-500': '#f43f5e',
-  'bg-lime-500': '#84cc16',
-  'bg-amber-500': '#f59e0b',
-  'bg-teal-500': '#14b8a6',
-  'bg-fuchsia-500': '#d946ef',
-};
-*/
 
 // Track used colors in the current room to ensure diversity
 const usedColorIndexes: number[] = [];
@@ -201,8 +153,6 @@ function getPlayerIndex(playerId: string): number {
   );
   return fallbackIndex;
 }
-
-// This function is no longer used since we directly use getPlayerIndex and rawColors in renderPlayerList
 
 // Declare io to avoid TypeScript error
 declare const io: () => Socket;
@@ -435,18 +385,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /**
    * Helper function to set up a game phase
-   * @param duration Duration in milliseconds
    * @param message Status message to show
    */
-  function setGamePhase(duration: number, message: string): void {
+  function setGamePhase(message: string): void {
     // Update status message with the current game phase
     const statusMessage = document.getElementById('status-message');
     if (statusMessage) {
       statusMessage.textContent = message;
     }
-
-    // Keep track of when the game phase started for calculating time spent on answers
-    roundEndTime = Date.now() + duration;
   }
 
   // Handle start challenge event
@@ -547,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearElementContent('voting-area');
 
         // Set up the challenge phase with timer if it's a new challenge
-        setGamePhase(data.duration, 'Answer the question when ready.');
+        setGamePhase('Answer the question when ready.');
       }
     },
   );
@@ -731,13 +677,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle start voting event
   socket.on('start_voting', (data: VoteData) => {
-    const { duration = 30000 } = data;
-
     // Store participants for looking up player IDs
     Object.assign(currentPlayers, data.participants);
 
     // Set up the voting phase
-    setGamePhase(duration, 'Click on an answer to vote for who you think is the AI!');
+    setGamePhase('Click on an answer to vote for who you think is the AI!');
 
     // We vote by clicking on answers, so we don't need to show the voting area
     const votingArea = document.getElementById('voting-area');
@@ -1837,8 +1781,6 @@ function clearElementContent(elementId: string): void {
 
 // Setup event listeners
 function setupEventListeners(): void {
-  // The join button is no longer needed since room selection is shown by default
-
   // Create room button click handler
   const createRoomButton = document.getElementById('create-room-button');
   if (createRoomButton) {
@@ -2104,13 +2046,9 @@ function setupEventListeners(): void {
         return;
       }
 
-      // Calculate time spent (from start until now)
-      const timeSpent = roundEndTime - Date.now();
-
       // Emit answer to server
       socket.emit('submit_answer', {
         answer,
-        timeSpent: Math.max(0, timeSpent),
       });
 
       // Disable input and hide button
