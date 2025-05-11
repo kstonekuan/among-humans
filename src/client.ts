@@ -338,6 +338,18 @@ document.addEventListener('DOMContentLoaded', () => {
         statusMessage.classList.add('bg-blue-500');
       }, 3000);
     }
+
+    // Clear room code from URL if it exists in the query parameters
+    const roomCode = getUrlParameter('room');
+    if (roomCode) {
+      clearRoomCodeFromUrl();
+
+      // Also clear the room code input field
+      const roomCodeInput = document.getElementById('room-code-input') as HTMLInputElement;
+      if (roomCodeInput) {
+        roomCodeInput.value = '';
+      }
+    }
   });
 
   // Handle player list updates
@@ -1777,6 +1789,55 @@ function setupEventListeners(): void {
     roomCodeInput.addEventListener('keyup', (event) => {
       if (event.key === 'Enter') {
         joinRoomButton.click();
+      }
+    });
+  }
+
+  // Exit room button click handler
+  const exitRoomButton = document.getElementById('exit-room-button');
+  if (exitRoomButton) {
+    exitRoomButton.addEventListener('click', () => {
+      // Only leave the room if we're actually in one
+      if (myRoomCode) {
+        // Leave socket.io room
+        socket.emit('leave_room');
+
+        // Clear room code
+        myRoomCode = '';
+
+        // Clear URL parameters
+        clearRoomCodeFromUrl();
+
+        // Hide room info area
+        const roomInfoArea = document.getElementById('room-info-area');
+        if (roomInfoArea) {
+          roomInfoArea.classList.add('hidden');
+        }
+
+        // Hide game grid
+        const gameGrid = document.getElementById('game-grid');
+        if (gameGrid) {
+          gameGrid.classList.add('hidden');
+        }
+
+        // Show room selection and game description
+        const roomSelectionArea = document.getElementById('room-selection-area');
+        const gameDescription = document.getElementById('game-description');
+
+        if (roomSelectionArea) {
+          roomSelectionArea.classList.remove('hidden');
+        }
+
+        if (gameDescription) {
+          gameDescription.classList.remove('hidden');
+        }
+
+        // Update status message
+        const statusMessage = document.getElementById('status-message');
+        if (statusMessage) {
+          statusMessage.textContent =
+            'You have left the room. Create a new room or join an existing one!';
+        }
       }
     });
   }

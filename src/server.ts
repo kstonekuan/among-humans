@@ -588,6 +588,52 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle player manually leaving a room
+  socket.on('leave_room', () => {
+    // Find player's room
+    const room = getRoomFromPlayerId(socket.id);
+    if (!room) return;
+
+    console.log(`[ROOM] Player ${socket.id} manually left room ${room.code}`);
+
+    // Store player's name before removing them from the room
+    const playerName = room.players[socket.id]?.name || 'A player';
+
+    // Remove player from the room
+    delete room.players[socket.id];
+
+    // Leave socket.io room
+    socket.leave(room.code);
+
+    // If room is empty, remove it
+    if (Object.keys(room.players).length === 0) {
+      delete rooms[room.code];
+      console.log(`[ROOM] Room ${room.code} removed because it's empty`);
+      console.log(`[ROOMS] Total active rooms: ${Object.keys(rooms).length}`);
+    } else {
+      // Notify all remaining clients in the room about player list update
+      io.to(room.code).emit('update_players', getFilteredPlayersForClient(room));
+
+      // Send status update to remaining players
+      io.to(room.code).emit('status_update', `${playerName} left the room.`);
+
+      // If game was in progress, end it
+      if (room.gameState !== 'waiting') {
+        room.gameState = 'waiting';
+        io.to(room.code).emit('status_update', 'Game ended because a player left');
+
+        // Show configuration UI to all remaining players
+        io.to(room.code).emit('show_config_ui', { isFirstGame: !room.isGameStarted });
+
+        // All remaining players can start the game
+        io.to(room.code).emit('enable_start_button');
+      }
+    }
+
+    // Send confirmation to the client
+    socket.emit('room_left');
+  });
+
   // Handle create room
   socket.on('create_room', () => {
     // Generate a unique room code
