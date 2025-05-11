@@ -14,7 +14,7 @@
     <div class="main-container">
         <h1 class="game-title">AmongHumans.io</h1>
 
-        <div id="status-message" class="status-message">
+        <div id="status-message" class="status-message hidden">
             Create a new room or join an existing one!
         </div>
 
@@ -55,24 +55,53 @@
         <!-- Game description (shown by default) -->
         <div id="game-description" class="card p-5 text-center mb-6">
             <h2 class="text-xl font-semibold mb-3">How to Play</h2>
-            <p class="mb-3">Among Humans is a social deduction game where one player is secretly an imposter AI.</p>
-            <div class="flex flex-col items-center gap-2">
+            <p class="mb-4">Among Humans is a social deduction game where one player is secretly an imposter AI. Create a room, invite friends, and try to identify which player isn't human!</p>
 
-                <div class="game-step">
-                    <div class="step-number">0</div>
-                    <p>Before the round starts: influence imposter AI's behavior and the type of questions</p>
+            <div class="carousel-container">
+                <div class="carousel-track">
+                    <div class="carousel-card">
+                        <div class="card-emoji">🎭</div>
+                        <h3 class="card-title">Influence the AI</h3>
+                        <p class="card-text">Each player submits a prompt to influence the AI's behavior.</p>
+                        <div class="card-example">Try: "Use movie quotes" or "End every sentence with LOL"</div>
+                        <div class="card-number">1</div>
+                    </div>
+
+                    <div class="carousel-card">
+                        <div class="card-emoji">✏️</div>
+                        <h3 class="card-title">Answer Questions</h3>
+                        <p class="card-text">Everyone (humans and the AI) answers the same question.</p>
+                        <div class="card-example">AI's answers will show influence from everyone's prompts!</div>
+                        <div class="card-number">2</div>
+                    </div>
+
+                    <div class="carousel-card">
+                        <div class="card-emoji">🔍</div>
+                        <h3 class="card-title">Vote for the AI</h3>
+                        <p class="card-text">Read all answers and vote for which one was written by the AI.</p>
+                        <div class="card-example">Look for patterns that seem not-quite-human!</div>
+                        <div class="card-number">3</div>
+                    </div>
+
+                    <div class="carousel-card">
+                        <div class="card-emoji">🏆</div>
+                        <h3 class="card-title">Score Points</h3>
+                        <p class="card-text">Get 2 points for identifying the AI. Get 1 point if others think you're the AI.</p>
+                        <div class="card-example">Try to mimic the AI's style to fool other players!</div>
+                        <div class="card-number">4</div>
+                    </div>
                 </div>
-                <div class="game-step">
-                    <div class="step-number">1</div>
-                    <p>All players answer the same question</p>
+
+                <div class="carousel-dots">
+                    <span class="dot active"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
                 </div>
-                <div class="game-step">
-                    <div class="step-number">2</div>
-                    <p>Try to identify which answer was written by the AI</p>
-                </div>
-                <div class="game-step">
-                    <div class="step-number">3</div>
-                    <p>Score points by correctly identifying the AI or by fooling others</p>
+
+                <div class="strategy-tip">
+                    <span class="tip-icon">💡</span>
+                    <p><strong>Strategy Tip:</strong> The AI behaves consistently across rounds - once you notice its patterns, mimic them to trick others!</p>
                 </div>
             </div>
         </div>
@@ -169,6 +198,45 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/client.js"></script>
+
+    <!-- Carousel interaction script -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const track = document.querySelector('.carousel-track');
+        const cards = document.querySelectorAll('.carousel-card');
+        const dots = document.querySelectorAll('.dot');
+
+        // Update active dot based on scroll position
+        function updateActiveDot() {
+          if (!track) return;
+
+          const scrollPosition = track.scrollLeft;
+          const cardWidth = cards[0].offsetWidth + 20; // card width + gap
+          const activeIndex = Math.round(scrollPosition / cardWidth);
+
+          dots.forEach((dot, index) => {
+            dot.classList.toggle('active', index === activeIndex);
+          });
+        }
+
+        // Scroll to card when dot is clicked
+        dots.forEach((dot, index) => {
+          dot.addEventListener('click', () => {
+            const cardWidth = cards[0].offsetWidth + 20; // card width + gap
+            track.scrollTo({
+              left: index * cardWidth,
+              behavior: 'smooth'
+            });
+          });
+        });
+
+        // Update active dot when scrolling
+        track.addEventListener('scroll', updateActiveDot);
+
+        // Initial update
+        updateActiveDot();
+      });
+    </script>
 </body>
 
 </html>
