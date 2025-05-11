@@ -970,16 +970,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scoringTitle.textContent = 'Player Scoring Breakdown:';
         statsArea.appendChild(scoringTitle);
 
-        // Add scoring explanation
-        const scoringExplanation = document.createElement('div');
-        scoringExplanation.className = 'mb-3 text-sm text-gray-600';
-        scoringExplanation.innerHTML = `
-          <p>• <strong>Detection Points:</strong> +2 points each time you correctly identified the AI</p>
-          <p>• <strong>Deception Points:</strong> Human players get +1 point for each vote received (including votes from the AI)</p>
-          <p>• <strong>AI Points:</strong> The AI gets +1 point for surviving each round without being detected (but doesn't get deception points)</p>
-        `;
-        statsArea.appendChild(scoringExplanation);
-
         // Create table for scoring breakdown
         const scoreTable = document.createElement('div');
         scoreTable.className = 'w-full mb-4 overflow-hidden rounded-lg border border-gray-200';
