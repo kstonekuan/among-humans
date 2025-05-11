@@ -49,7 +49,6 @@ type Player = {
 type Answer = {
   playerId: string;
   answer: string;
-  timeSpent: number;
 };
 
 type RoundData = {
@@ -1385,24 +1384,14 @@ function activateAIPlayer(room: Room): void {
 async function generateAIAnswerWithContext(
   room: Room,
   gamePrompt: string | null,
-  options: {
-    useCurrentRoundAnswersOnly?: boolean; // Whether to use only current round answers (for immediate/mid-round generation)
-    immediateResponse?: boolean; // Whether this is an immediate response (affects timing)
-  },
-): Promise<{ answer: string; timeTaken: number } | null> {
+): Promise<string | null> {
   // Don't generate answer if AI is not active or prompt is null
   if (!room.aiPlayerActive || !gamePrompt) {
     return null;
   }
-
-  // Default options
-  const { useCurrentRoundAnswersOnly = false, immediateResponse = false } = options;
-
   try {
     // Log generation attempt
-    console.log(
-      `[ROOM] Generating AI answer for room ${room.code}${immediateResponse ? ' immediately' : ''}`,
-    );
+    console.log(`[ROOM] Generating AI answer for room ${room.code}`);
 
     // Collect human answers for context and analysis
     const humanAnswers: string[] = [];
@@ -1416,38 +1405,6 @@ async function generateAIAnswerWithContext(
       humanAnswers.push(answer);
       totalAnswerCount++;
       totalAnswerLength += answer.length;
-    }
-
-    if (!useCurrentRoundAnswersOnly) {
-      const prevHumanAnswers: Record<string, Array<string>> = {};
-
-      // Collect from previous rounds
-      if (room.allRoundsVotes && room.allRoundsVotes.length > 0) {
-        for (const round of room.allRoundsVotes) {
-          // Skip the current round answers
-          if (round.roundNumber === room.currentRound) continue;
-
-          // Find answers for this round via the room's state
-          for (const playerId in room.players) {
-            if (playerId === room.aiPlayerId) continue;
-
-            if (room.currentRoundData.answers[playerId]) {
-              const answer = room.currentRoundData.answers[playerId].answer;
-
-              // Initialize player's answer array if needed
-              if (!prevHumanAnswers[playerId]) {
-                prevHumanAnswers[playerId] = [];
-              }
-
-              // Add this answer
-              prevHumanAnswers[playerId].push(answer);
-              humanAnswers.push(answer);
-              totalAnswerCount++;
-              totalAnswerLength += answer.length;
-            }
-          }
-        }
-      }
     }
 
     // Calculate average answer length to help the AI match
@@ -1483,20 +1440,11 @@ async function generateAIAnswerWithContext(
     console.log(`[PRE_GEN] casing style: ${casingStyle}`);
     console.log(`[PRE_GEN] total human answers count: ${totalAnswerCount}`);
     console.log(`[PRE_GEN] total human answer length: ${totalAnswerLength}`);
-    // Add human answers context (different approach based on mode)
-    if (useCurrentRoundAnswersOnly && humanAnswers.length > 0) {
-      // For immediate generation, include ALL current answers for perfect mimicry
-      answerPrompt += `\n\nHere are all the human answers to the current question:
-      ${humanAnswers.join('\n')}
+    // Add human answers context
+    answerPrompt += `\n\nHere are all the human answers to the current question:
+    ${humanAnswers.join('\n')}
       
-      Your answer must be ORIGINAL and different from these examples, but should match their overall style, tone, and capitalization patterns. Don't directly copy any phrases or expressions, but do try to sound like part of this specific group.`;
-    } else if (humanAnswers.length > 0) {
-      // For scheduled generation, just use them as style examples
-      answerPrompt += `\n\nHere are some example answers from other players to previous questions (not the current question):
-      ${humanAnswers.slice(0, 5).join('\n')}
-      
-      Use these as style references only - your answer must be original and responsive to the current question. Match their overall style, tone, and capitalization patterns.`;
-    }
+    Your answer must be ORIGINAL and different from these examples, but should match their overall style, tone, and capitalization patterns. Don't directly copy any phrases or expressions, but do try to sound like part of this specific group.`;
 
     // Add any combined imposter instructions if available
     if (room.combinedImposterPrompt) {
@@ -1511,9 +1459,7 @@ async function generateAIAnswerWithContext(
       '\n\nONLY provide the answer, no explanations or context. Answer as a human would in a casual conversation.';
 
     // Send request to OpenAI
-    console.log(
-      `[LLM_CALL] AI Player Answer Generator - room ${room.code} - ${immediateResponse ? 'immediate' : 'scheduled'}`,
-    );
+    console.log(`[LLM_CALL] AI Player Answer Generator - room ${room.code}`);
     const response = await openai.chat.completions.create({
       model: 'gpt-4.1-mini',
       max_tokens: 1024,
@@ -1523,36 +1469,7 @@ async function generateAIAnswerWithContext(
     // Extract answer
     const aiAnswer = extractTextFromResponse(response);
 
-    // Calculate response time based on mode
-    let aiTimeTaken: number;
-
-    if (immediateResponse) {
-      // Very short time for immediate responses
-      aiTimeTaken = 1000; // 1 second - as if AI just got the answer really quickly
-    } else {
-      // Simulate more realistic time for scheduled responses
-      // Get average time spent by humans if available
-      let avgTimeSpent = 5000; // Default 5 seconds
-      let totalTime = 0;
-      let playerCount = 0;
-
-      for (const playerId in room.currentRoundData.answers) {
-        if (playerId !== room.aiPlayerId) {
-          totalTime += room.currentRoundData.answers[playerId].timeSpent;
-          playerCount++;
-        }
-      }
-
-      if (playerCount > 0) {
-        avgTimeSpent = Math.floor(totalTime / playerCount);
-      }
-
-      // Add randomness but keep it in a reasonable range compared to humans
-      const timeVariance = Math.floor(avgTimeSpent * 0.3); // 30% variance
-      aiTimeTaken = avgTimeSpent + Math.random() * timeVariance * 2 - timeVariance;
-    }
-
-    return { answer: aiAnswer, timeTaken: aiTimeTaken };
+    return aiAnswer;
   } catch (error) {
     console.error('Error generating AI answer:', error);
 
@@ -1564,10 +1481,7 @@ async function generateAIAnswerWithContext(
 async function generateAndSubmitAIAnswer(room: Room, gamePrompt: string | null): Promise<void> {
   try {
     // Generate AI answer with current round answers for context
-    const result = await generateAIAnswerWithContext(room, gamePrompt, {
-      useCurrentRoundAnswersOnly: true,
-      immediateResponse: true,
-    });
+    const result = await generateAIAnswerWithContext(room, gamePrompt);
 
     // Handle result or error
     if (result) {
@@ -1575,8 +1489,7 @@ async function generateAndSubmitAIAnswer(room: Room, gamePrompt: string | null):
       if (room.gameState === 'challenge') {
         room.currentRoundData.answers[room.aiPlayerId] = {
           playerId: room.aiPlayerId,
-          answer: result.answer,
-          timeSpent: result.timeTaken,
+          answer: result,
         };
 
         // Mark AI as having answered
@@ -1612,7 +1525,6 @@ function endChallengePhase(room: Room): void {
       id: participant.id,
       name: participant.name,
       answer: answer ? answer.answer : '', // Use empty string instead of null
-      time: answer ? answer.timeSpent : 0, // Use 0 instead of null
     };
   });
 
@@ -1624,7 +1536,6 @@ type PublicAnswerData = {
   id: string;
   name: string;
   answer: string | null;
-  time: number | null;
 };
 
 function proceedToShowPublicResults(room: Room, answers: PublicAnswerData[]): void {
