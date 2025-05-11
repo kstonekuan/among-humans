@@ -1827,7 +1827,22 @@ function setupEventListeners(): void {
       const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
       const answer = answerInput.value; // Don't trim to preserve partial answers
 
-      // Always submit the answer, even if empty
+      // Prevent empty answer submission
+      if (!answer.trim()) {
+        // Flash the input field with a red border to indicate error
+        answerInput.classList.add('error-border');
+        setTimeout(() => {
+          answerInput.classList.remove('error-border');
+        }, 1000);
+
+        // Update status to show error
+        const statusMessage = document.getElementById('status-message');
+        if (statusMessage) {
+          statusMessage.textContent = 'Please enter an answer before submitting.';
+        }
+        return;
+      }
+
       // Calculate time spent (from start until now)
       const timeSpent = roundEndTime - Date.now();
 

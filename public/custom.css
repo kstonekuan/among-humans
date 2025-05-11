@@ -835,6 +835,32 @@ input[type="reset"],
   display: none !important;
 }
 
+/* Error state for textarea/input validation */
+.error-border {
+  border: 3px solid var(--danger-color) !important;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.3) !important;
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
 /* Remove floating blobs */
 .main-container::before,
 .main-container::after {
