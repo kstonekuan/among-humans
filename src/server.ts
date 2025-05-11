@@ -38,6 +38,7 @@ type Player = {
   name: string;
   score: number;
   isAI: boolean;
+  isReady?: boolean;
   hasAnswered?: boolean;
   hasVotedThisRound?: boolean;
   roomCode?: string;
@@ -408,18 +409,6 @@ function getFilteredPlayersForClient(room: Room): Record<string, Player> {
   return filteredPlayers;
 }
 
-function reassignPlayerNames(room: Room): void {
-  const roomUsedNames: string[] = [];
-
-  for (const playerId in room.players) {
-    if (playerId !== room.aiPlayerId) {
-      room.players[playerId].name = getRandomPlayerName(roomUsedNames);
-    }
-  }
-
-  io.to(room.code).emit('update_players', getFilteredPlayersForClient(room));
-}
-
 function getRoomFromPlayerId(playerId: string): Room | null {
   // Find the room the player is in
   for (const roomCode in rooms) {
@@ -428,6 +417,129 @@ function getRoomFromPlayerId(playerId: string): Room | null {
     }
   }
   return null;
+}
+
+function startGame(room: Room): void {
+  // Don't start if game already in progress
+  if (room.gameState !== 'waiting') return;
+
+  // Check if we've already completed all rounds
+  if (room.roundsCompleted) {
+    io.to(room.code).emit(
+      'status_update',
+      'All rounds have been completed. Start a new game for more rounds.',
+    );
+    return;
+  }
+
+  // Show loading indicator to all clients in the room
+  io.to(room.code).emit('loading_game');
+
+  // Activate AI player if needed
+  if (!room.aiPlayerActive && Object.values(room.players).filter((p) => !p.isAI).length >= 1) {
+    activateAIPlayer(room);
+  }
+
+  // Don't continue without AI player
+  if (!room.aiPlayerActive) return;
+
+  // Increment current round counter
+  room.currentRound++;
+
+  // Log round information
+  console.log(
+    `[ROOM] Room ${room.code} starting round ${room.currentRound} of ${room.totalRounds}`,
+  );
+
+  // Combine all player imposter prompts
+  if (Object.keys(room.playerImposterPrompts).length > 0) {
+    const prompts = Object.values(room.playerImposterPrompts);
+
+    // Base prompt that ensures concise responses and sets general behavior
+    const basePrompt = `Keep your answer short.
+                  Be concise and direct. Remember that humans only
+                  have about 45 seconds to read and answer each question,
+                  so they typically give brief responses.
+                  Try to write like it's a text message (minimal capitalization and punctuation).`;
+
+    room.combinedImposterPrompt = combineImposterPrompts(prompts, basePrompt);
+    console.log(`[ROOM] Combined ${prompts.length} imposter prompts for room ${room.code}`);
+  }
+
+  // Set game state to challenge
+  room.gameState = 'challenge';
+
+  // Check if this is the first round/game start
+  if (!room.isGameStarted) {
+    // Mark the game as started (no longer reassigning names)
+    room.isGameStarted = true;
+
+    // Log that the game has started
+    console.log(
+      `[ROOM] Game started in room ${room.code} with ${Object.keys(room.players).length} players`,
+    );
+
+    // Generate all questions upfront for the entire game
+    generateMultipleQuestions(room)
+      .then(() => {
+        // Start the first round
+        selectPromptForRound(room)
+          .then((prompt) => {
+            room.currentRoundData.prompt = prompt;
+            startRound(room);
+          })
+          .catch((error) => {
+            console.error('Error selecting prompt for first round:', error);
+            room.gameState = 'waiting';
+            io.to(room.code).emit('error', 'Failed to start game. Please try again.');
+          });
+      })
+      .catch((error) => {
+        console.error('Error generating questions:', error);
+        room.gameState = 'waiting';
+        io.to(room.code).emit('error', 'Failed to start game. Please try again.');
+      });
+  } else {
+    // Starting a new round in an existing game
+    selectPromptForRound(room)
+      .then((prompt) => {
+        room.currentRoundData.prompt = prompt;
+        startRound(room);
+      })
+      .catch((error) => {
+        console.error('Error selecting prompt for new round:', error);
+        room.gameState = 'waiting';
+        io.to(room.code).emit('error', 'Failed to start round. Please try again.');
+      });
+  }
+}
+
+function startRound(room: Room): void {
+  // Reset round data
+  room.currentRoundData.answers = {};
+  room.currentRoundData.participants = {};
+  room.currentRoundData.currentVotes = {};
+
+  // Add all active players to the current round participants
+  for (const playerId in room.players) {
+    // Create a shallow copy of player for current round
+    room.currentRoundData.participants[playerId] = { ...room.players[playerId] };
+
+    // Reset each player's answer status for the new round
+    room.players[playerId].hasAnswered = false;
+    room.players[playerId].hasVotedThisRound = false;
+  }
+
+  // Emit start challenge event to all clients
+  io.to(room.code).emit('start_challenge', {
+    prompt: room.currentRoundData.prompt,
+    players: getFilteredPlayersForClient(room),
+    currentRound: room.currentRound,
+    totalRounds: room.totalRounds,
+  });
+
+  // Send event to hide start button / game controls
+  io.to(room.code).emit('hide_game_controls');
 }
 
 io.on('connection', (socket) => {
@@ -532,6 +644,7 @@ io.on('connection', (socket) => {
       name: randomName,
       score: 0,
       isAI: false,
+      isReady: false,
       roomCode,
     };
 
@@ -591,6 +704,7 @@ io.on('connection', (socket) => {
       name: randomName,
       score: 0,
       isAI: false,
+      isReady: false,
       roomCode,
     };
 
@@ -630,7 +744,40 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle request to start a new round
+  // Handle player ready status
+  socket.on('player_ready', (readyStatus: boolean) => {
+    // Find player's room
+    const room = getRoomFromPlayerId(socket.id);
+    if (!room) return;
+
+    // Only update ready status if in waiting state
+    if (room.gameState !== 'waiting') return;
+
+    // Update player ready status
+    if (room.players[socket.id]) {
+      room.players[socket.id].isReady = readyStatus;
+
+      // Notify all players about the updated ready status
+      io.to(room.code).emit('update_players', getFilteredPlayersForClient(room));
+
+      // For initial game start (first round), require all players to be ready
+      // For subsequent rounds, any player can start the next round
+      if (!room.isGameStarted) {
+        // Initial game start - check if all players are ready
+        const allPlayers = Object.values(room.players).filter((p) => !p.isAI);
+        const allPlayersReady = allPlayers.length > 0 && allPlayers.every((p) => p.isReady);
+
+        if (allPlayersReady) {
+          startGame(room);
+        }
+      } else if (readyStatus) {
+        // This is between rounds and this player is ready - start next round immediately
+        startGame(room);
+      }
+    }
+  });
+
+  // Handle request to start a new round (admin override or direct start)
   socket.on('request_start_round', () => {
     // Find player's room
     const room = getRoomFromPlayerId(socket.id);
@@ -639,159 +786,28 @@ io.on('connection', (socket) => {
     // Don't start a new round if one is already in progress
     if (room.gameState !== 'waiting') return;
 
-    // Check if we've already completed all rounds
-    if (room.roundsCompleted) {
-      socket.emit(
-        'status_update',
-        'All rounds have been completed. Start a new game for more rounds.',
-      );
-      return;
-    }
+    // For between-rounds, any player can start the next round
+    // For first round (initial game start), still use the ready system
+    if (room.isGameStarted) {
+      // Between rounds - start immediately
+      startGame(room);
+    } else {
+      // First game - mark this player as ready
+      if (room.players[socket.id]) {
+        room.players[socket.id].isReady = true;
 
-    // Show loading indicator to all clients in the room
-    io.to(room.code).emit('loading_game');
+        // Notify all players about the updated ready status
+        io.to(room.code).emit('update_players', getFilteredPlayersForClient(room));
 
-    // Activate AI player if needed
-    if (!room.aiPlayerActive && Object.values(room.players).filter((p) => !p.isAI).length >= 1) {
-      activateAIPlayer(room);
-    }
+        // Check if all players are now ready
+        const allPlayers = Object.values(room.players).filter((p) => !p.isAI);
+        const allPlayersReady = allPlayers.length > 0 && allPlayers.every((p) => p.isReady);
 
-    // Don't continue without AI player
-    if (!room.aiPlayerActive) return;
-
-    // Increment current round counter
-    room.currentRound++;
-
-    // Log round information
-    console.log(
-      `[ROOM] Room ${room.code} starting round ${room.currentRound} of ${room.totalRounds}`,
-    );
-
-    // Combine all player imposter prompts
-    if (Object.keys(room.playerImposterPrompts).length > 0) {
-      const prompts = Object.values(room.playerImposterPrompts);
-
-      // Base prompt that ensures concise responses and sets general behavior
-      const basePrompt = `Keep your answer short. 
-                      Be concise and direct. Remember that humans only 
-                      have about 45 seconds to read and answer each question, 
-                      so they typically give brief responses.
-                      Try to write like it's a text message (minimal capitalization and punctuation).`;
-
-      room.combinedImposterPrompt = combineImposterPrompts(prompts, basePrompt);
-      console.log(`[ROOM] Combined ${prompts.length} imposter prompts for room ${room.code}`);
-    }
-
-    // Set game state to challenge
-    room.gameState = 'challenge';
-
-    // Check if this is the first round/game start
-    if (!room.isGameStarted) {
-      // Only randomize player names at game start
-      reassignPlayerNames(room);
-
-      // Mark the game as started
-      room.isGameStarted = true;
-
-      // Log that the game has started
-      console.log(
-        `[ROOM] Game started in room ${room.code} with ${Object.keys(room.players).length} players`,
-      );
-
-      // Generate all questions upfront for the entire game
-      // Show loading indicator to clients
-      io.to(room.code).emit('status_update', 'Generating unique questions for this game...');
-
-      // First, clear any existing generated questions
-      room.generatedQuestions = [];
-
-      // Generate questions asynchronously - will be ready by the time we need them
-      generateMultipleQuestions(room).catch((error) => {
-        console.error(`[ROOM] Error pre-generating questions for room ${room.code}:`, error);
-      });
-    }
-
-    // Generate a prompt using pre-generated questions or generate on-demand if needed
-    selectPromptForRound(room)
-      .then((prompt) => {
-        room.currentRoundData.prompt = prompt;
-
-        // Clear previous round data
-        room.currentRoundData.answers = {};
-        room.currentRoundData.currentVotes = {};
-
-        // Store current players
-        room.currentRoundData.participants = { ...room.players };
-
-        // Reset answer and voting state for all participants
-        for (const player of Object.values(room.currentRoundData.participants)) {
-          player.hasAnswered = false;
-          player.hasVotedThisRound = false;
+        if (allPlayersReady) {
+          startGame(room);
         }
-
-        // Emit start_challenge event to all clients in the room, including round info
-        io.to(room.code).emit('start_challenge', {
-          prompt: room.currentRoundData.prompt,
-          duration: 0, // Duration no longer needed
-          currentRound: room.currentRound,
-          totalRounds: room.totalRounds,
-        });
-
-        // Send event to hide start button and AI prompt input for all players
-        io.to(room.code).emit('hide_game_controls');
-
-        // Save this round's data to history
-        const historyEntry = {
-          roundNumber: room.currentRound,
-          prompt: room.currentRoundData.prompt,
-          answers: {}, // Will be filled with answers as they come in
-        };
-        room.roundsHistory.push(historyEntry);
-
-        // No need to trigger scheduled AI answer generation
-        // AI will answer after all humans have submitted their answers
-
-        // No round timer for auto-submission
-        // Players can take as long as they want to answer
-      })
-      .catch((error) => {
-        console.error('Error generating prompt:', error);
-
-        // Fallback to a random prompt
-        const randomIndex = Math.floor(Math.random() * gamePrompts.length);
-        room.currentRoundData.prompt = gamePrompts[randomIndex];
-
-        // Continue with the game using the fallback prompt
-        // Clear previous round data
-        room.currentRoundData.answers = {};
-        room.currentRoundData.currentVotes = {};
-
-        // Store current players
-        room.currentRoundData.participants = { ...room.players };
-
-        // Reset answer and voting state for all participants
-        for (const player of Object.values(room.currentRoundData.participants)) {
-          player.hasAnswered = false;
-          player.hasVotedThisRound = false;
-        }
-
-        // Emit start_challenge event to all clients in the room, including round info
-        io.to(room.code).emit('start_challenge', {
-          prompt: room.currentRoundData.prompt,
-          duration: 30000, // Shorter duration for fallback case, for client-side tracking only
-          currentRound: room.currentRound,
-          totalRounds: room.totalRounds,
-        });
-
-        // Send event to hide start button and AI prompt input for all players
-        io.to(room.code).emit('hide_game_controls');
-
-        // No need to trigger scheduled AI answer generation
-        // AI will answer after all humans have submitted their answers
-
-        // No round timer for auto-submission
-        // Players can take as long as they want to answer
-      });
+      }
+    }
   });
 
   // Handle player submitting an answer

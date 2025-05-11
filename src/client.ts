@@ -9,6 +9,7 @@ interface Player {
   answer?: string;
   time?: number;
   roomCode?: string;
+  isReady?: boolean;
 }
 
 interface PublicAnswer {
@@ -309,11 +310,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (startButton && roundConfig) {
       // Set the appropriate button text based on the game state
       if (data?.isFirstGame) {
-        startButton.textContent = 'Start Game';
+        startButton.textContent = 'Ready?';
         // Show round configuration at the start of the game
         roundConfig.classList.remove('hidden');
       } else {
-        startButton.textContent = 'Next Round';
+        startButton.textContent = 'Start Next Round';
         // Hide round configuration for subsequent rounds
         roundConfig.classList.add('hidden');
       }
@@ -930,7 +931,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // We already checked that answersArea exists above
         const waitingMessage = document.createElement('div');
         waitingMessage.className = 'bg-blue-50 p-3 rounded-lg mt-4 text-center';
-        waitingMessage.innerHTML = '<- Click next round when everyone is ready!';
+        waitingMessage.innerHTML =
+          '<- Click "Start Next Round" when you\'re ready to continue! Any player can start the next round.';
         // Cast to HTMLElement to handle the type error
         (answersArea as HTMLElement).appendChild(waitingMessage);
       }
@@ -1775,14 +1777,46 @@ function setupEventListeners(): void {
     });
   }
 
-  // Start round button click handler
-  const startRoundButton = document.getElementById('start-round-button');
+  // Ready/Start button click handler
+  const startRoundButton = document.getElementById('start-round-button') as HTMLButtonElement;
   if (startRoundButton) {
     startRoundButton.addEventListener('click', () => {
-      // Change button state to loading (will be applied to all clients via the server event)
-      socket.emit('request_start_round');
+      // Get current player
+      const currentPlayer = myPlayerId ? currentPlayers[myPlayerId] : null;
 
-      // The server will emit loading state and hide game controls events to all clients
+      if (!currentPlayer) return;
+
+      // Check if this is first game or between rounds
+      // Between rounds: button text will be "Start Next Round"
+      // First game: button text will be "Ready?" or "Ready ✓"
+      const isBetweenRounds = startRoundButton.textContent === 'Start Next Round';
+
+      if (isBetweenRounds) {
+        // Between rounds - any player can start the next round
+        socket.emit('request_start_round');
+
+        // Show loading state
+        startRoundButton.innerHTML =
+          '<span class="animate-spin inline-block mr-2">⟳</span> Loading...';
+        startRoundButton.disabled = true;
+        startRoundButton.classList.add('opacity-75');
+      } else {
+        // First game - use the ready system
+        // Toggle ready state
+        const isReady = !currentPlayer.isReady;
+
+        // Update button text based on ready state
+        if (isReady) {
+          startRoundButton.textContent = 'Ready ✓';
+          startRoundButton.classList.add('opacity-75');
+        } else {
+          startRoundButton.textContent = 'Ready?';
+          startRoundButton.classList.remove('opacity-75');
+        }
+
+        // Notify server about ready status change
+        socket.emit('player_ready', isReady);
+      }
     });
   }
 
@@ -1881,11 +1915,6 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
   // Clear the player list
   playerList.innerHTML = '';
 
-  // In waiting state, don't show any players
-  if (isWaiting) {
-    return;
-  }
-
   // Sort players alphabetically by name
   const sortedPlayers = Object.values(serverPlayers).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1935,34 +1964,67 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
     avatarDiv.style.marginRight = '0.75rem';
     avatarDiv.textContent = firstLetter;
 
-    // Add player name span - no rank display
-    const nameSpan = document.createElement('span');
-    nameSpan.innerHTML = `${player.name}${player.id === myPlayerId ? ' <span style="color: #2563eb;">(you)</span>' : ''}`;
+    // Add player name span with ready status
+    const nameSpan = document.createElement('div');
+    nameSpan.style.display = 'flex';
+    nameSpan.style.flexDirection = 'column';
 
-    // Create vote counter container (right side)
-    const voteDiv = document.createElement('div');
-    voteDiv.style.display = 'flex';
-    voteDiv.style.flexDirection = 'row';
-    voteDiv.style.alignItems = 'center';
+    // Player name with "you" indicator if applicable
+    const nameText = document.createElement('span');
+    nameText.innerHTML = `${player.name}${player.id === myPlayerId ? ' <span style="color: #2563eb;">(you)</span>' : ''}`;
+    nameSpan.appendChild(nameText);
 
-    // Vote counter
-    const voteCounterSpan = document.createElement('span');
-    voteCounterSpan.style.backgroundColor = '#a5b4fc';
-    voteCounterSpan.style.color = 'white';
-    voteCounterSpan.style.borderRadius = '9999px';
-    voteCounterSpan.style.padding = '0.25rem 0.75rem';
-    voteCounterSpan.style.fontSize = '0.875rem';
-    voteCounterSpan.style.fontWeight = '600';
-    voteCounterSpan.textContent = voteCount.toString();
+    // Ready status indicator (only show in waiting state)
+    if (isWaiting) {
+      const readyStatus = document.createElement('span');
+      readyStatus.style.fontSize = '0.75rem';
+
+      if (player.isReady) {
+        readyStatus.style.color = '#10b981'; // Green for ready
+        readyStatus.textContent = 'Ready';
+      } else {
+        readyStatus.style.color = '#f59e0b'; // Amber for not ready
+        readyStatus.textContent = 'Not ready';
+      }
+
+      nameSpan.appendChild(readyStatus);
+    }
+
+    // Create right side container (votes or ready indicator)
+    const rightDiv = document.createElement('div');
+    rightDiv.style.display = 'flex';
+    rightDiv.style.flexDirection = 'row';
+    rightDiv.style.alignItems = 'center';
+
+    if (isWaiting) {
+      // Ready status indicator (visual)
+      const readyIndicator = document.createElement('span');
+      readyIndicator.style.width = '1rem';
+      readyIndicator.style.height = '1rem';
+      readyIndicator.style.borderRadius = '9999px';
+      readyIndicator.style.backgroundColor = player.isReady ? '#10b981' : '#f59e0b'; // Green if ready, amber if not
+
+      rightDiv.appendChild(readyIndicator);
+    } else {
+      // Vote counter during game
+      const voteCounterSpan = document.createElement('span');
+      voteCounterSpan.style.backgroundColor = '#a5b4fc';
+      voteCounterSpan.style.color = 'white';
+      voteCounterSpan.style.borderRadius = '9999px';
+      voteCounterSpan.style.padding = '0.25rem 0.75rem';
+      voteCounterSpan.style.fontSize = '0.875rem';
+      voteCounterSpan.style.fontWeight = '600';
+      voteCounterSpan.textContent = voteCount.toString();
+
+      rightDiv.appendChild(voteCounterSpan);
+    }
 
     // Assemble the player item
     playerInfoDiv.appendChild(avatarDiv);
     playerInfoDiv.appendChild(nameSpan);
 
-    voteDiv.appendChild(voteCounterSpan);
-
     playerItem.appendChild(playerInfoDiv);
-    playerItem.appendChild(voteDiv);
+    playerItem.appendChild(rightDiv);
 
     // Add to player list
     playerList.appendChild(playerItem);
