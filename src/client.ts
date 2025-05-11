@@ -1660,10 +1660,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .sort((a, b) => a.playerName.localeCompare(b.playerName));
 
           for (const answerData of sortedAnswers) {
-            // Format time spent in seconds
-            const timeSpentSeconds = Math.round(answerData.timeSpent / 1000);
-            const timeDisplay = timeSpentSeconds > 0 ? `${timeSpentSeconds}s` : 'Time expired';
-
             const answerItem = document.createElement('div');
             answerItem.className = 'p-2 border border-gray-200 rounded bg-gray-50';
 
@@ -1673,9 +1669,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             answerItem.innerHTML = `
-              <div class="flex justify-between mb-1">
+              <div class="mb-1">
                 <span class="font-semibold ${answerData.isAI ? 'text-red-600' : ''}">${answerData.playerName}${answerData.isAI ? ' (AI)' : ''}</span>
-                <span class="text-xs text-gray-500">Time: ${timeDisplay}</span>
               </div>
               <div class="text-sm">
                 ${answerData.answer || '<em class="text-gray-400">No answer provided</em>'}
