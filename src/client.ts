@@ -388,7 +388,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update player count if in a room
     if (myRoomCode) {
-      updatePlayerCount(Object.keys(serverPlayers).length);
+      // Filter out AI players from the count
+      const humanPlayerCount = Object.values(serverPlayers).filter((player) => !player.isAI).length;
+      updatePlayerCount(humanPlayerCount);
     }
   });
 
@@ -2314,8 +2316,15 @@ function renderPlayerList(serverPlayers: Record<string, Player>): void {
 // Update player count display
 function updatePlayerCount(count: number): void {
   const playerCountElement = document.getElementById('player-count');
+  const playerLabelElement = document.querySelector('.player-counter span:last-child');
+
   if (playerCountElement) {
     playerCountElement.textContent = count.toString();
+  }
+
+  // Update the label to show "player" or "players" based on count
+  if (playerLabelElement) {
+    playerLabelElement.textContent = count === 1 ? 'player' : 'players';
   }
 }
 
