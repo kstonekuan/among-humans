@@ -1481,7 +1481,6 @@ async function generateAIAnswerWithContext(
 
     console.log(`[PRE_GEN] average answer length: ${avgAnswerLength}`);
     console.log(`[PRE_GEN] casing style: ${casingStyle}`);
-    console.log(`[PRE_GEN] human answers: ${humanAnswers}`);
     console.log(`[PRE_GEN] total human answers count: ${totalAnswerCount}`);
     console.log(`[PRE_GEN] total human answer length: ${totalAnswerLength}`);
     // Add human answers context (different approach based on mode)
