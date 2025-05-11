@@ -206,6 +206,40 @@ function getPlayerIndex(playerId: string): number {
 // Declare io to avoid TypeScript error
 declare const io: () => Socket;
 
+// Function to get URL parameters
+function getUrlParameter(name: string): string | null {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get(name);
+}
+
+// Function to update URL with room code
+function updateUrlWithRoomCode(roomCode: string): void {
+  // Create a new URL object based on the current URL
+  const url = new URL(window.location.href);
+
+  // Set the room parameter
+  url.searchParams.set('room', roomCode);
+
+  // Update the URL without reloading the page
+  window.history.pushState({}, '', url.toString());
+
+  console.log(`URL updated with room code: ${roomCode}`);
+}
+
+// Function to clear room code from URL
+function clearRoomCodeFromUrl(): void {
+  // Create a new URL object based on the current URL
+  const url = new URL(window.location.href);
+
+  // Remove the room parameter
+  url.searchParams.delete('room');
+
+  // Update the URL without reloading the page
+  window.history.pushState({}, '', url.toString());
+
+  console.log('Room code cleared from URL');
+}
+
 // Connect to server when page loads
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize socket connection
@@ -215,6 +249,28 @@ document.addEventListener('DOMContentLoaded', () => {
   socket.on('connect', () => {
     console.log('Connected to server');
     myPlayerId = socket.id;
+
+    // Make sure status message is visible
+    const statusMessage = document.getElementById('status-message');
+    if (statusMessage) {
+      statusMessage.classList.remove('hidden');
+      statusMessage.textContent = 'Create a new room or join an existing one!';
+    }
+
+    // Check if room code is in URL parameters
+    const roomCode = getUrlParameter('room');
+    if (roomCode) {
+      console.log(`Found room code in URL: ${roomCode}`);
+
+      // Attempt to join the room directly using the socket
+      socket.emit('join_room', roomCode);
+
+      // Also update the input field in case the join fails and we need to show the UI
+      const roomCodeInput = document.getElementById('room-code-input') as HTMLInputElement;
+      if (roomCodeInput) {
+        roomCodeInput.value = roomCode;
+      }
+    }
   });
 
   // Room selection is now shown by default on page load, so this just updates the message
@@ -1151,6 +1207,8 @@ document.addEventListener('DOMContentLoaded', () => {
         roundConfig.classList.remove('hidden');
 
         newGameButton.addEventListener('click', () => {
+          // Clear room code from URL before reloading
+          clearRoomCodeFromUrl();
           // Reload the page for simplicity
           window.location.reload();
         });
@@ -1603,6 +1661,9 @@ function handleRoomJoined(data: RoomData): void {
   myRoomCode = roomCode;
   myPlayerId = player.id;
 
+  // Update URL with room code
+  updateUrlWithRoomCode(roomCode);
+
   // Hide room selection area and game description
   const roomSelectionArea = document.getElementById('room-selection-area');
   const gameDescription = document.getElementById('game-description');
@@ -1625,21 +1686,24 @@ function handleRoomJoined(data: RoomData): void {
     roomInfoArea.classList.remove('hidden');
     roomCodeDisplay.textContent = roomCode;
 
-    // Add click-to-copy functionality
+    // Add click-to-copy functionality (copy both room code and full URL)
     roomCodeDisplay.addEventListener('click', async () => {
       try {
-        await navigator.clipboard.writeText(roomCode);
+        // Copy full URL with room code for easy sharing
+        const shareUrl = new URL(window.location.href);
+        shareUrl.searchParams.set('room', roomCode);
+        await navigator.clipboard.writeText(shareUrl.toString());
 
         // Show temporary success feedback
         const originalContent = roomCodeDisplay.textContent;
-        roomCodeDisplay.textContent = 'Copied!';
+        roomCodeDisplay.textContent = 'Copied URL!';
 
         // Reset after a short delay
         setTimeout(() => {
           roomCodeDisplay.textContent = originalContent;
         }, 1000);
       } catch (err) {
-        console.error('Failed to copy room code:', err);
+        console.error('Failed to copy room code URL:', err);
       }
     });
   }
