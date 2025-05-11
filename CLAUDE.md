@@ -6,4 +6,5 @@
 - Seek out good opportunities for unit testing and implement them
 - You can run build, lint, and format commands but do not run the server itself
 - Prefer accurate and descriptive function names over writing comments, even if they are verbose
+- Do not leave behind legacy code and comments
 - Important note about Tailwind CSS 4.x: If styling issues occur, check the generated tailwind.css file for missing classes. Tailwind 4.x requires using the 'safelist' option in tailwind.config.js to include dynamically used classes. The project uses a custom.css file to supplement missing classes.
