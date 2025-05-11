@@ -1229,8 +1229,6 @@ io.on('connection', (socket) => {
 
     // If all human players have voted, end the voting phase immediately
     if (allPlayersVoted) {
-      // Make sure AI also votes
-      determineAndCastAIVote(room);
       // End voting phase
       endVotingPhase(room);
     }
@@ -1681,84 +1679,11 @@ function startVotingPhase(room: Room): void {
   // Voting phase ends when all players have voted
 }
 
-function determineAndCastAIVote(room: Room): void {
-  // Validate game state and AI player
-  if (
-    room.gameState !== 'voting' ||
-    !room.aiPlayerActive ||
-    room.currentRoundData.currentVotes[room.aiPlayerId]
-  ) {
-    return;
-  }
-
-  // Get all human players in this room
-  const humanPlayers = Object.values(room.currentRoundData.participants).filter(
-    (p) => !p.isAI && p.id !== room.aiPlayerId,
-  );
-
-  // If no humans to vote for, return
-  if (humanPlayers.length === 0) return;
-
-  // Tally human votes in this room
-  const voteCounts: Record<string, number> = {};
-
-  for (const voterId in room.currentRoundData.currentVotes) {
-    const votedForId = room.currentRoundData.currentVotes[voterId];
-    voteCounts[votedForId] = (voteCounts[votedForId] || 0) + 1;
-  }
-
-  // Determine AI vote target using strategy
-  let aiVoteTarget = null;
-  const random = Math.random();
-
-  // Strategy 1 (50% chance): Vote for the player with the most votes
-  if (random < 0.5) {
-    let maxVotes = 0;
-    let mostVotedPlayers: string[] = [];
-
-    for (const playerId in voteCounts) {
-      if (playerId !== room.aiPlayerId) {
-        if (voteCounts[playerId] > maxVotes) {
-          maxVotes = voteCounts[playerId];
-          mostVotedPlayers = [playerId];
-        } else if (voteCounts[playerId] === maxVotes) {
-          mostVotedPlayers.push(playerId);
-        }
-      }
-    }
-
-    // If there are players with votes, randomly select one
-    if (mostVotedPlayers.length > 0) {
-      const randomIndex = Math.floor(Math.random() * mostVotedPlayers.length);
-      aiVoteTarget = mostVotedPlayers[randomIndex];
-    }
-  }
-  // Strategy 2 (30% chance): Vote for player with awkward answer heuristic
-  else if (random < 0.8) {
-    // In a real implementation, this would analyze answers for awkwardness
-    // For now, just pick a random player
-    const randomIndex = Math.floor(Math.random() * humanPlayers.length);
-    aiVoteTarget = humanPlayers[randomIndex].id;
-  }
-  // Strategy 3 (20% chance): Vote for random human
-  else {
-    const randomIndex = Math.floor(Math.random() * humanPlayers.length);
-    aiVoteTarget = humanPlayers[randomIndex].id;
-  }
-
-  // Cast AI vote if target was determined
-  if (aiVoteTarget) {
-    room.currentRoundData.currentVotes[room.aiPlayerId] = aiVoteTarget;
-    console.log(`AI player in room ${room.code} voted for: ${aiVoteTarget}`);
-  }
-}
+// AI voting functionality removed as AI votes are not counted
 
 function endVotingPhase(room: Room): void {
   // Don't end if not in voting phase
   if (room.gameState !== 'voting') return;
-
-  // Ensure AI has voted
-  determineAndCastAIVote(room);
 
   // Save round votes for historical tracking
   room.allRoundsVotes.push({
