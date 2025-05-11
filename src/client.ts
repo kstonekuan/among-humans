@@ -525,15 +525,17 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.classList.remove('hidden');
 
         if (!isReconnection) {
-          // Normal challenge - enable input
+          // Normal challenge - enable input and clear value
           answerInput.value = '';
           answerInput.disabled = false;
           submitButton.disabled = false;
         } else {
-          // Reconnection - the server will tell us if we've already answered
-          // Keep them disabled until we receive status update
-          answerInput.disabled = true;
-          submitButton.disabled = true;
+          // For reconnection, we'll initially enable the input
+          // The server will tell us if we've already answered via status_update event
+          answerInput.disabled = false;
+          submitButton.disabled = false;
+
+          // Don't clear existing value on reconnection
         }
       }
 
@@ -574,6 +576,44 @@ document.addEventListener('DOMContentLoaded', () => {
         (card as HTMLElement).style.cursor = 'default';
       }
     }
+  });
+
+  // Handle restore vote selection event (for reconnection)
+  socket.on('restore_vote_selection', (data: { votedPlayerId: string; playerName: string }) => {
+    const { votedPlayerId, playerName } = data;
+
+    // Find the answer card that this player voted for and mark it as selected
+    const answerCards = document.querySelectorAll('.answer-card');
+    for (const card of Array.from(answerCards)) {
+      const cardPlayerName = (card as HTMLElement).dataset.playerName;
+
+      // If this is the card the player voted for
+      if (cardPlayerName === playerName) {
+        // Add selected-answer class to highlight it
+        card.classList.add('selected-answer');
+
+        // Remove vote-enabled class and disable cursor to prevent re-voting
+        card.classList.remove('vote-enabled');
+        (card as HTMLElement).style.cursor = 'default';
+      } else {
+        // Make sure all other cards are not selectable
+        card.classList.remove('vote-enabled');
+        (card as HTMLElement).style.cursor = 'default';
+      }
+    }
+
+    console.log(`Restored vote selection for player ${playerName} (${votedPlayerId})`);
+  });
+
+  // Handle update vote statistics event (for reconnection)
+  socket.on('update_vote_statistics', (data: { playerVotesReceived: Record<string, number> }) => {
+    // Update global player votes received with the server data
+    playerVotesReceived = data.playerVotesReceived || {};
+
+    // Update the player list to reflect vote counts
+    renderPlayerList(currentPlayers);
+
+    console.log('Updated vote statistics from server:', playerVotesReceived);
   });
 
   // Handle public answers event

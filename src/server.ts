@@ -914,6 +914,11 @@ io.on('connection', (socket) => {
       // Send current game state to reconnected player
       socket.emit('status_update', 'Welcome back! Rejoining the game in progress...');
 
+      // Always send vote statistics during reconnection to ensure UI correctly shows votes
+      socket.emit('update_vote_statistics', {
+        playerVotesReceived: room.playerVotesReceived,
+      });
+
       // First, send the current round information to ensure UI displays correctly
       if (room.currentRound > 0 && room.totalRounds > 0) {
         socket.emit('rounds_set', room.totalRounds);
@@ -935,6 +940,9 @@ io.on('connection', (socket) => {
         // If the player has already answered in this round, disable the answer input
         if (room.currentRoundData.answers[socket.id]) {
           socket.emit('status_update', 'You already submitted an answer. Waiting for others...');
+        } else {
+          // If they haven't answered yet, let them know they can still submit
+          socket.emit('status_update', 'Answer the question when ready.');
         }
       }
       // If in results phase, send the current answers
@@ -993,10 +1001,24 @@ io.on('connection', (socket) => {
           duration: 0, // No timer
         });
 
-        // If player has already voted, update status
+        // If player has already voted, update status and send which player they voted for
         if (room.players[socket.id]?.hasVotedThisRound) {
           socket.emit('status_update', 'Vote cast! Waiting for results...');
+
+          // If player has already voted, send their vote selection to restore UI state
+          if (room.currentRoundData.currentVotes[socket.id]) {
+            const votedPlayerId = room.currentRoundData.currentVotes[socket.id];
+            socket.emit('restore_vote_selection', {
+              votedPlayerId,
+              playerName: room.players[votedPlayerId]?.name || '',
+            });
+          }
         }
+
+        // Always send current vote statistics to ensure UI reflects votes
+        socket.emit('update_vote_statistics', {
+          playerVotesReceived: room.playerVotesReceived,
+        });
 
         // Update player list
         socket.emit('update_players', getFilteredPlayersForClient(room));
