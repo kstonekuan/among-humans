@@ -698,9 +698,24 @@ document.addEventListener('DOMContentLoaded', () => {
           border-color: #3b82f6 !important;
         }
         .selected-answer {
-          background-color: #dbeafe !important;
-          border-color: #2563eb !important;
-          border-width: 2px !important;
+          background-color: #ff8cb4 !important; /* Bright pink background for more contrast */
+          border-color: #ff4d94 !important; /* Darker pink border */
+          border-width: 3px !important; /* Thicker border */
+          box-shadow: 0 0 10px rgba(255, 140, 180, 0.5) !important; /* Add glow effect */
+          transform: translateY(-2px) !important; /* Slight lift effect */
+          position: relative !important;
+        }
+        .selected-answer::after {
+          content: "✓ Your vote" !important;
+          position: absolute !important;
+          top: -10px !important;
+          right: 10px !important;
+          background-color: #ff4d94 !important;
+          color: white !important;
+          padding: 3px 8px !important;
+          border-radius: 10px !important;
+          font-size: 12px !important;
+          font-weight: bold !important;
         }
         .cannot-vote {
           background-color: #fee2e2 !important;
@@ -1447,24 +1462,7 @@ document.addEventListener('DOMContentLoaded', () => {
     leaderboardSection.appendChild(leaderboardTable);
     resultsContainer.appendChild(leaderboardSection);
 
-    // Add scoring explanation section
-    const scoringSection = document.createElement('section');
-    scoringSection.className = 'mb-8 p-4 bg-gray-50 rounded-lg';
-
-    const scoringTitle = document.createElement('h3');
-    scoringTitle.className = 'text-xl font-semibold mb-3';
-    scoringTitle.textContent = 'How Scoring Works';
-    scoringSection.appendChild(scoringTitle);
-
-    const scoringExplanation = document.createElement('div');
-    scoringExplanation.className = 'text-sm space-y-2';
-    scoringExplanation.innerHTML = `
-      <p>• <strong>Detection Points:</strong> Human players get +2 points each time they correctly identified the AI</p>
-      <p>• <strong>Deception Points:</strong> Human players get +1 point for each vote received (including votes from the AI)</p>
-      <p>• <strong>AI Points:</strong> The AI gets +1 point for surviving each round without being detected</p>
-    `;
-    scoringSection.appendChild(scoringExplanation);
-    resultsContainer.appendChild(scoringSection);
+    // Scoring explanation section removed as requested
 
     // Add AI Imposter Instructions section
     const imposterSection = document.createElement('section');
@@ -1596,13 +1594,13 @@ document.addEventListener('DOMContentLoaded', () => {
           'w-full bg-gray-100 px-4 py-3 text-left font-semibold flex items-center justify-between hover:bg-gray-200';
         roundHeader.innerHTML = `
           <span>Round ${round.roundNumber}</span>
-          <span class="text-gray-500 text-sm">▼</span>
+          <span class="text-gray-500 text-sm">▲</span>
         `;
         roundPanel.appendChild(roundHeader);
 
-        // Create collapsible content
+        // Create content (expanded by default)
         const roundContent = document.createElement('div');
-        roundContent.className = 'hidden p-4 bg-white';
+        roundContent.className = 'p-4 bg-white';
 
         // Get round history data if available
         const historyItem = historyMap.get(round.roundNumber);
@@ -1731,11 +1729,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add toggle functionality
         roundHeader.addEventListener('click', () => {
-          const isHidden = roundContent.classList.contains('hidden');
-          roundContent.classList.toggle('hidden', !isHidden);
+          const isVisible = !roundContent.classList.contains('hidden');
+          roundContent.classList.toggle('hidden', isVisible);
           const arrow = roundHeader.querySelector('span:last-child');
           if (arrow) {
-            arrow.textContent = isHidden ? '▲' : '▼';
+            arrow.textContent = isVisible ? '▼' : '▲';
           }
         });
       }
