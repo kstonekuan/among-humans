@@ -31,9 +31,8 @@ Can you outsmart the AI player? Or can you fool everyone into thinking *you're* 
     * **Answering:** Players submit their answers within a time limit.
     * **Voting:** All answers are displayed (anonymously), and players vote for who they think is the AI.
 5.  **Results & Scoring:**
-    * **AI Caught:** If the AI receives the most votes, humans who voted correctly score points (+2).
-    * **Human Deception:** If a human receives the most votes, that player scores points (+3) for successful deception, and the AI scores (+1) for surviving.
-    * **AI Survives:** In other cases (e.g., tie among humans), the AI scores (+1) for surviving.
+    * **AI Identification:** Humans who correctly vote for the AI score points (+2).
+    * **Human Deception:** Humans receive +1 point for each vote they receive from other humans.
 6.  **Final Results:** At the end of all rounds, the game reveals the AI's identity and shows detailed statistics about detection success, player scores, and influence instructions.
 
 ## Key Features

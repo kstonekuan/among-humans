@@ -1629,93 +1629,68 @@ function endVotingPhase(room: Room): void {
   // Check if this was the final round
   const isLastRound = room.currentRound >= room.totalRounds;
 
-  // Apply dual scoring logic
-  const aiWasMostVoted = mostVotedPlayerIds.includes(room.aiPlayerId);
-  const singleMostVotedPlayerId = mostVotedPlayerIds.length === 1 ? mostVotedPlayerIds[0] : null;
-  let resultMessage = '';
+  // Simple scoring logic
+  let resultMessage = `Round ${room.currentRound}: Voting complete!`;
   const roundWinners: string[] = [];
 
-  // Keep track of correct AI detections
+  // Award points based on votes
   for (const voterId in room.currentRoundData.currentVotes) {
-    if (
-      room.currentRoundData.currentVotes[voterId] === room.aiPlayerId &&
-      voterId !== room.aiPlayerId
-    ) {
-      // Initialize player's detection success count if not already there
+    const votedForId = room.currentRoundData.currentVotes[voterId];
+
+    // Skip AI votes
+    if (voterId === room.aiPlayerId) continue;
+
+    // Award +2 points to humans who correctly identify the AI
+    if (votedForId === room.aiPlayerId) {
+      // Award points to correct human voters (+2)
+      if (room.players[voterId]) {
+        room.players[voterId].score += 2;
+        roundWinners.push(voterId);
+      }
+
+      // Keep track of correct AI detections
       if (!room.playerAIDetectionSuccess[voterId]) {
         room.playerAIDetectionSuccess[voterId] = 0;
       }
-      // Increment success count
       room.playerAIDetectionSuccess[voterId] += 1;
     }
   }
 
-  // Case 1: AI was caught
-  if (aiWasMostVoted) {
-    // Don't reveal it was the AI in the message unless it's the last round
-    resultMessage = isLastRound
-      ? `Round ${room.currentRound}: AI detected!`
-      : `Round ${room.currentRound}: Voting complete!`;
+  // Award +1 point to humans for each vote they receive (regardless of who got the most)
+  for (const playerId in votesReceived) {
+    // Skip AI player - AI doesn't get points for votes
+    if (playerId === room.aiPlayerId) continue;
 
-    // Award points to correct human voters (+2)
-    for (const voterId in room.currentRoundData.currentVotes) {
-      if (
-        room.currentRoundData.currentVotes[voterId] === room.aiPlayerId &&
-        voterId !== room.aiPlayerId
-      ) {
-        if (room.players[voterId]) {
-          room.players[voterId].score += 2;
-          roundWinners.push(voterId);
-        }
+    // Add 1 point per vote received in this round
+    if (room.players[playerId] && votesReceived[playerId] > 0) {
+      room.players[playerId].score += votesReceived[playerId];
+
+      // Add to round winners if not already added
+      if (!roundWinners.includes(playerId)) {
+        roundWinners.push(playerId);
       }
     }
   }
-  // Case 2: Single human was most voted
-  else if (singleMostVotedPlayerId && singleMostVotedPlayerId !== room.aiPlayerId) {
+
+  // Update result message if a human player received the most votes
+  const mostVotedPlayerId = Object.entries(votesReceived)
+    .filter(([playerId]) => playerId !== room.aiPlayerId) // Filter out AI
+    .sort(([, countA], [, countB]) => countB - countA)[0]?.[0]; // Get the player with most votes
+
+  if (mostVotedPlayerId && votesReceived[mostVotedPlayerId] > 0) {
     resultMessage = `Round ${room.currentRound}: ${
-      room.players[singleMostVotedPlayerId]?.name || 'Human player'
+      room.players[mostVotedPlayerId]?.name || 'Human player'
     } received the most votes!`;
-
-    // Award points to deceptive human (+3)
-    if (room.players[singleMostVotedPlayerId]) {
-      room.players[singleMostVotedPlayerId].score += 3;
-      roundWinners.push(singleMostVotedPlayerId);
-    }
-
-    // Award points to AI for surviving (+1)
-    if (room.players[room.aiPlayerId]) {
-      room.players[room.aiPlayerId].score += 1;
-      roundWinners.push(room.aiPlayerId);
-    }
   }
-  // Case 3: Tie or no votes
-  else {
-    resultMessage = `Round ${room.currentRound}: No consensus reached.`;
 
-    // Award points to AI for surviving (+1)
-    if (room.players[room.aiPlayerId]) {
-      room.players[room.aiPlayerId].score += 1;
-      roundWinners.push(room.aiPlayerId);
-    }
-  }
+  // Keep the message consistent across rounds
 
   if (isLastRound) {
     room.roundsCompleted = true;
     resultMessage += ' Final round completed!';
 
-    // Add deception points to final scores on the last round
-    // This ensures votes received across all rounds are added to the total score
-    for (const playerId in room.playerVotesReceived) {
-      // Skip AI player - AI doesn't get deception points
-      if (playerId === room.aiPlayerId) continue;
-
-      // Add 1 point per vote received
-      if (room.players[playerId]) {
-        const votesReceived = room.playerVotesReceived[playerId] || 0;
-        room.players[playerId].score += votesReceived;
-        console.log(`[SCORE] Adding ${votesReceived} deception points to player ${playerId}`);
-      }
-    }
+    // No need to add additional deception points at the end of the game
+    // We're now awarding points immediately in each round
   }
 
   // Reset game state
