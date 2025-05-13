@@ -3,16 +3,17 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
     <title>AmongHumans</title>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-55GXNCYYJ2"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
 
-      gtag('config', 'G-55GXNCYYJ2');
+        gtag('config', 'G-55GXNCYYJ2');
     </script>
     <link rel="stylesheet" href="tailwind.css">
     <link rel="stylesheet" href="custom.css">
@@ -29,8 +30,12 @@
         </div>
 
         <a href="https://github.com/kstonekuan/among-humans" target="_blank" id="github-link" class="github-link">
-            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                aria-hidden="true">
+                <path
+                    d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+                </path>
             </svg>
         </a>
 
@@ -140,7 +145,7 @@
                             <label for="round-count" class="block text-sm text-gray-600 mb-1">Number of rounds:</label>
                             <div class="flex gap-2">
                                 <input type="number" id="round-count" min="1" max="10" value="3"
-                                    class="input-field w-full">
+                                    class="input-field w-full" maxlength="2">
                                 <button id="set-rounds-button" class="button button-primary">
                                     Set
                                 </button>
@@ -156,8 +161,12 @@
                                 imposter:</label>
                             <textarea id="ai-imposter-prompt" rows="2"
                                 placeholder="Examples: 'sound like a teenager', 'pretend to be confused', 'use British slang'"
-                                class="textarea-field w-full mb-2"
+                                class="textarea-field w-full mb-1" maxlength="100"
                                 style="min-height: 80px; max-width: 100%; box-sizing: border-box;"></textarea>
+                            <div class="text-right mb-1">
+                                <span id="ai-imposter-prompt-counter" class="text-xs text-gray-500">100 characters
+                                    remaining</span>
+                            </div>
                             <button id="submit-imposter-prompt" class="button button-primary w-full mb-2"
                                 style="max-width: 100%;">
                                 Submit Your Influence
@@ -179,8 +188,12 @@
                                 <div class="w-full">
                                     <textarea id="custom-question-input" rows="2"
                                         placeholder="Examples: 'childhood memories', 'unpopular opinions', 'dream vacations', 'strange habits', 'food preferences'"
-                                        class="textarea-field w-full mb-2"
+                                        class="textarea-field w-full mb-1" maxlength="100"
                                         style="min-height: 80px; max-width: 100%; box-sizing: border-box;"></textarea>
+                                    <div class="text-right mb-1">
+                                        <span id="custom-question-counter" class="text-xs text-gray-500">100 characters
+                                            remaining</span>
+                                    </div>
                                     <button id="submit-custom-question" class="button button-primary w-full mb-2"
                                         style="max-width: 100%;">
                                         Submit Topic Ideas
@@ -210,7 +223,12 @@
                 <!-- Game status display area -->
 
                 <textarea id="answer-input" rows="3" placeholder="Your answer..."
-                    class="hidden textarea-field w-full mb-3" style="width: 100%; box-sizing: border-box;"></textarea>
+                    class="hidden textarea-field w-full mb-1" maxlength="100"
+                    style="width: 100%; box-sizing: border-box;"></textarea>
+
+                <div class="text-right mb-2">
+                    <span id="answer-input-counter" class="text-xs text-gray-500 hidden">100 characters remaining</span>
+                </div>
 
                 <button id="submit-answer-button" class="hidden button button-primary w-full mb-4">
                     Submit Answer

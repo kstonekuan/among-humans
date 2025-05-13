@@ -477,24 +477,53 @@ document.addEventListener('DOMContentLoaded', () => {
       // Show and enable the input and submit button
       const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
       const submitButton = document.getElementById('submit-answer-button') as HTMLButtonElement;
+      const counterElement = document.getElementById('answer-input-counter');
 
       if (answerInput && submitButton) {
         // Always make elements visible
         answerInput.classList.remove('hidden');
         submitButton.classList.remove('hidden');
 
+        // Show character counter
+        if (counterElement) {
+          counterElement.classList.remove('hidden');
+        }
+
         if (!isReconnection) {
           // Normal challenge - enable input and clear value
           answerInput.value = '';
           answerInput.disabled = false;
           submitButton.disabled = false;
+
+          // Reset character counter
+          if (counterElement) {
+            counterElement.textContent = `${answerInput.maxLength} characters remaining`;
+            counterElement.classList.remove('text-yellow-500', 'text-red-500', 'font-semibold');
+            counterElement.classList.add('text-gray-500');
+          }
         } else {
           // For reconnection, we'll initially enable the input
           // The server will tell us if we've already answered via status_update event
           answerInput.disabled = false;
           submitButton.disabled = false;
 
-          // Don't clear existing value on reconnection
+          // Update counter based on current value
+          if (counterElement) {
+            const remaining = answerInput.maxLength - answerInput.value.length;
+            counterElement.textContent = `${remaining} characters remaining`;
+
+            // Style the counter based on remaining characters
+            if (remaining <= 20) {
+              counterElement.classList.remove('text-gray-500');
+              counterElement.classList.add('text-red-500', 'font-semibold');
+            } else if (remaining <= 50) {
+              counterElement.classList.remove('text-gray-500', 'text-red-500', 'font-semibold');
+              counterElement.classList.add('text-yellow-500');
+            } else {
+              counterElement.classList.remove('text-yellow-500', 'text-red-500', 'font-semibold');
+              counterElement.classList.add('text-gray-500');
+            }
+          }
         }
       }
 
@@ -521,11 +550,17 @@ document.addEventListener('DOMContentLoaded', () => {
       // Disable answer input since this player has already answered
       const answerInput = document.getElementById('answer-input') as HTMLTextAreaElement;
       const submitButton = document.getElementById('submit-answer-button') as HTMLButtonElement;
+      const counterElement = document.getElementById('answer-input-counter');
 
       if (answerInput && submitButton) {
         answerInput.disabled = true;
         submitButton.disabled = true;
         submitButton.classList.add('hidden');
+
+        // Hide character counter when answer is submitted
+        if (counterElement) {
+          counterElement.classList.add('hidden');
+        }
       }
     } else if (message === 'Vote cast! Waiting for results...') {
       // When reconnecting during voting phase, ensure we show the player has already voted
@@ -1671,6 +1706,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Add event listeners for UI elements
   setupEventListeners();
+
+  // Setup character counters for text inputs
+  setupCharacterCounters();
 });
 
 // Helper function to handle joined room logic (whether created or joined)
@@ -2036,6 +2074,12 @@ function setupEventListeners(): void {
       answerInput.disabled = true;
       submitAnswerButton.classList.add('hidden');
 
+      // Hide the character counter
+      const counterElement = document.getElementById('answer-input-counter');
+      if (counterElement) {
+        counterElement.classList.add('hidden');
+      }
+
       // Update status
       const statusMessage = document.getElementById('status-message');
       if (statusMessage) {
@@ -2280,5 +2324,45 @@ function castVote(votedPlayerId: string): void {
   const statusMessage = document.getElementById('status-message');
   if (statusMessage) {
     statusMessage.textContent = 'Vote cast! Waiting for results...';
+  }
+}
+
+// Setup character counters for all textareas with maxlength
+function setupCharacterCounters(): void {
+  // Define input elements and their counter spans
+  const inputCounterPairs = [
+    { inputId: 'ai-imposter-prompt', counterId: 'ai-imposter-prompt-counter' },
+    { inputId: 'custom-question-input', counterId: 'custom-question-counter' },
+    { inputId: 'answer-input', counterId: 'answer-input-counter' },
+  ];
+
+  // For each textarea, add an input event listener to update the counter
+  for (const pair of inputCounterPairs) {
+    const inputElement = document.getElementById(pair.inputId) as HTMLTextAreaElement;
+    const counterElement = document.getElementById(pair.counterId);
+
+    if (inputElement && counterElement) {
+      // Set initial counter value
+      const maxLength = inputElement.maxLength;
+      counterElement.textContent = `${maxLength} characters remaining`;
+
+      // Update counter when input changes
+      inputElement.addEventListener('input', () => {
+        const remaining = maxLength - inputElement.value.length;
+        counterElement.textContent = `${remaining} characters remaining`;
+
+        // Add color feedback based on remaining characters
+        if (remaining <= 20) {
+          counterElement.classList.remove('text-gray-500');
+          counterElement.classList.add('text-red-500', 'font-semibold');
+        } else if (remaining <= 50) {
+          counterElement.classList.remove('text-gray-500', 'text-red-500', 'font-semibold');
+          counterElement.classList.add('text-yellow-500');
+        } else {
+          counterElement.classList.remove('text-yellow-500', 'text-red-500', 'font-semibold');
+          counterElement.classList.add('text-gray-500');
+        }
+      });
+    }
   }
 }

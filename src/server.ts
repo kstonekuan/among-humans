@@ -1118,10 +1118,14 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Enforce character limit (100 characters max)
+    const MAX_ANSWER_LENGTH = 100;
+    const sanitizedAnswer = data.answer ? data.answer.substring(0, MAX_ANSWER_LENGTH) : '';
+
     // Store human answer
     const answerData = {
       playerId: socket.id,
-      answer: data.answer,
+      answer: sanitizedAnswer,
     };
 
     // Store in current round data
@@ -1186,12 +1190,6 @@ io.on('connection', (socket) => {
             if (room.currentRoundData.participants[room.aiPlayerId]) {
               room.currentRoundData.participants[room.aiPlayerId].hasAnswered = true;
             }
-
-            // Add a short delay before ending the challenge phase
-            // This allows time for any client-side auto-submissions to arrive
-            setTimeout(() => {
-              endChallengePhase(room);
-            }, 500); // 500ms delay to collect all partial answers
           }
         });
     }
@@ -1259,9 +1257,15 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Enforce character limit (100 characters max)
+    const MAX_PROMPT_LENGTH = 100;
+    const sanitizedPrompt = data?.imposterPrompt
+      ? data.imposterPrompt.substring(0, MAX_PROMPT_LENGTH)
+      : '';
+
     // Store the imposter prompt if provided
-    if (data?.imposterPrompt) {
-      room.playerImposterPrompts[socket.id] = data.imposterPrompt;
+    if (sanitizedPrompt) {
+      room.playerImposterPrompts[socket.id] = sanitizedPrompt;
 
       // Notify all players that a player has influenced the AI
       io.to(room.code).emit(
@@ -1321,13 +1325,19 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Enforce character limit (100 characters max)
+    const MAX_QUESTION_PROMPT_LENGTH = 100;
+    const sanitizedQuestion = data?.customQuestion
+      ? data.customQuestion.substring(0, MAX_QUESTION_PROMPT_LENGTH)
+      : '';
+
     // Store the question prompt if provided
-    if (data?.customQuestion) {
-      room.playerQuestionPrompts[socket.id] = data.customQuestion;
+    if (sanitizedQuestion) {
+      room.playerQuestionPrompts[socket.id] = sanitizedQuestion;
 
       // Also store it in the player object for persistence
       if (room.players[socket.id]) {
-        room.players[socket.id].customQuestion = data.customQuestion;
+        room.players[socket.id].customQuestion = sanitizedQuestion;
       }
 
       // Notify all players that a player has suggested question topics
