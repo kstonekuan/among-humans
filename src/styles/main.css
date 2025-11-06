@@ -1,0 +1,8 @@
+/* Import Google Fonts first (must be before all other rules) */
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Comic+Neue:wght@400;700&display=swap");
+
+/* Import Tailwind */
+@import "tailwindcss";
+
+/* Import custom styles */
+@import "./custom.css";

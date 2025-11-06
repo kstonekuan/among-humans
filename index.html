@@ -10,13 +10,11 @@
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-55GXNCYYJ2"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
+        function gtag(...args) { dataLayer.push(args); }
         gtag('js', new Date());
 
         gtag('config', 'G-55GXNCYYJ2');
     </script>
-    <link rel="stylesheet" href="tailwind.css">
-    <link rel="stylesheet" href="custom.css">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔍</text></svg>">
 </head>
@@ -240,12 +238,13 @@
         </div>
     </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/client.js"></script>
+    <!-- Vite will bundle the TypeScript client and CSS -->
+    <script type="module" src="/src/client.ts"></script>
+    <link rel="stylesheet" href="/src/styles/main.css">
 
     <!-- Carousel interaction script -->
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', () => {
             const track = document.querySelector('.carousel-track');
             const cards = document.querySelectorAll('.carousel-card');
             const dots = document.querySelectorAll('.dot');
