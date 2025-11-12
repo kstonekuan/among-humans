@@ -1,0 +1,13 @@
+{
+	"$schema": "https://unpkg.com/knip@latest/schema.json",
+	"entry": ["src/client.ts", "index.html"],
+	"project": ["src/**/*.ts"],
+	"ignore": ["dist/**", "node_modules/**", "**/*.test.ts", "**/*.spec.ts"],
+	"ignoreDependencies": ["tailwindcss", "@vitest/coverage-v8"],
+	"ignoreExportsUsedInFile": {
+		"type": true
+	},
+	"vite": {
+		"entry": ["index.html"]
+	}
+}

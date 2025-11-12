@@ -5,6 +5,7 @@ import express from "express";
 import OpenAI from "openai";
 import { Server } from "socket.io";
 import { extractTextFromResponse } from "./openai-patch";
+import type { Player, Room } from "./types";
 import {
 	analyzeCasingFromHumanAnswers,
 	casingStyleToString,
@@ -14,17 +15,39 @@ import { combineImposterPrompts } from "./utils/promptCombiner";
 
 dotenv.config();
 
-let openai: OpenAI;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+// LLM Configuration
+const LLM_MODEL = "openai.gpt-oss-120b-1:0";
+const LLM_DEFAULT_MAX_TOKENS = 1024;
 
-if (!OPENAI_API_KEY) {
-	console.error("ERROR: Missing OPENAI_API_KEY environment variable");
+let openai: OpenAI;
+const AWS_REGION = process.env.AWS_REGION || "us-east-1";
+const BEDROCK_API_KEY = process.env.BEDROCK_API_KEY;
+
+if (!BEDROCK_API_KEY) {
+	console.error("ERROR: Missing BEDROCK_API_KEY environment variable");
+	console.error(
+		"Please generate an Amazon Bedrock API key from the AWS Console",
+	);
 	process.exit(1);
-} else {
-	openai = new OpenAI({
-		apiKey: OPENAI_API_KEY,
+}
+
+// Initialize OpenAI client to use AWS Bedrock's OpenAI-compatible endpoint
+openai = new OpenAI({
+	apiKey: BEDROCK_API_KEY,
+	baseURL: `https://bedrock-runtime.${AWS_REGION}.amazonaws.com/openai/v1`,
+});
+console.log(`AWS Bedrock client initialized (region: ${AWS_REGION})`);
+
+// Helper function to call LLM with consistent configuration
+async function callLLM(
+	prompt: string,
+	maxTokens: number = LLM_DEFAULT_MAX_TOKENS,
+): Promise<OpenAI.Chat.Completions.ChatCompletion> {
+	return await openai.chat.completions.create({
+		model: LLM_MODEL,
+		max_tokens: maxTokens,
+		messages: [{ role: "user", content: prompt }],
 	});
-	console.log("OpenAI API client initialized");
 }
 
 const app = express();
@@ -43,80 +66,6 @@ if (process.env.NODE_ENV === "production") {
 		res.sendFile(path.join(__dirname, "client/index.html"));
 	});
 }
-
-type Player = {
-	id: string;
-	name: string;
-	score: number;
-	isAI: boolean;
-	isReady?: boolean;
-	hasAnswered?: boolean;
-	hasVotedThisRound?: boolean;
-	roomCode?: string;
-	customQuestion?: string;
-	isActive?: boolean; // Flag to track if player is currently connected
-};
-
-type Answer = {
-	playerId: string;
-	answer: string;
-};
-
-type RoundData = {
-	prompt: string | null;
-	answers: Record<string, Answer>;
-	participants: Record<string, Player>;
-	currentVotes: Record<string, string>;
-};
-
-type Room = {
-	code: string;
-	players: Record<string, Player>;
-	gameState: "waiting" | "challenge" | "results" | "voting";
-	isGameStarted: boolean;
-	currentRoundData: RoundData;
-	aiPlayerId: string;
-	currentAiPlayerName: string;
-	aiPlayerActive: boolean;
-	playerImposterPrompts: Record<string, string>; // Collection of player-provided imposter prompts
-	combinedImposterPrompt?: string; // The final combined imposter prompt
-	playerQuestionPrompts: Record<string, string>; // Collection of player-provided prompts for question generation
-	combinedQuestionPrompt?: string; // The final combined prompt for question generation
-
-	// Store previously used questions to avoid repetition
-	usedQuestions: string[]; // Array of previously used questions
-
-	// Store pre-generated questions for all rounds
-	generatedQuestions: Array<{
-		question: string;
-		topic?: string; // The player topic this question focuses on
-		used: boolean; // Whether this question has been used
-	}>;
-
-	// Round configuration
-	totalRounds: number;
-	currentRound: number;
-	roundsCompleted: boolean;
-
-	// Track votes across rounds
-	allRoundsVotes: Array<{
-		roundNumber: number;
-		votes: Record<string, string>; // voterId -> votedForId
-	}>;
-
-	// Track round history (for showing in final results)
-	roundsHistory: Array<{
-		roundNumber: number;
-		prompt: string;
-		answers: Record<string, Answer>; // playerId -> answer
-	}>;
-
-	// Track votes received per player
-	playerVotesReceived: Record<string, number>; // playerId -> number of votes received
-
-	// Track AI detection success
-	playerAIDetectionSuccess: Record<string, number>; // playerId -> number of correct AI detections
-};
 
 function generateRoomCode(): string {
 	const characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Omitting similar-looking characters
@@ -176,11 +125,7 @@ async function generatePromptWithAI(room: Room): Promise<string> {
     `;
 
 		console.log(`[LLM_CALL] Fallback Question Generator - room ${room.code}`);
-		const response = await openai.chat.completions.create({
-			model: "gpt-4.1-mini",
-			max_tokens: 1024,
-			messages: [{ role: "user", content: promptGen }],
-		});
+		const response = await callLLM(promptGen);
 
 		// Extract generated question
 		const generatedQuestion = extractTextFromResponse(response);
@@ -298,11 +243,7 @@ async function generateMultipleQuestions(room: Room): Promise<void> {
     `;
 
 		console.log(`[LLM_CALL] Batch Questions Generator - room ${room.code}`);
-		const response = await openai.chat.completions.create({
-			model: "gpt-4.1-mini",
-			max_tokens: 2048,
-			messages: [{ role: "user", content: promptGen }],
-		});
+		const response = await callLLM(promptGen, 2048);
 
 		// Extract generated questions
 		const responseText = extractTextFromResponse(response);
@@ -1598,13 +1539,9 @@ async function generateAIAnswerWithContext(
 		answerPrompt +=
 			"\n\nONLY provide the answer, no explanations or context. Answer as a human would in a casual conversation.";
 
-		// Send request to OpenAI
+		// Send request to LLM
 		console.log(`[LLM_CALL] AI Player Answer Generator - room ${room.code}`);
-		const response = await openai.chat.completions.create({
-			model: "gpt-4.1-mini",
-			max_tokens: 1024,
-			messages: [{ role: "user", content: answerPrompt }],
-		});
+		const response = await callLLM(answerPrompt);
 
 		// Extract answer
 		const aiAnswer = extractTextFromResponse(response);

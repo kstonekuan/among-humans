@@ -56,7 +56,7 @@ Note: This codebase was largely generated with [Claude Code](https://www.anthrop
 *   **Backend:** Node.js, Express.js, TypeScript
 *   **Real-time Communication:** Socket.IO
 *   **Frontend:** HTML5, Tailwind CSS 4.x, TypeScript
-*   **AI:** OpenAI API (gpt-4.1-mini model)
+*   **AI:** AWS Bedrock (openai.gpt-oss-120b-1:0 model via OpenAI-compatible API)
 *   **Environment Variables:** `dotenv`
 *   **Code Quality:** Biome (linting and formatting)
 
@@ -73,13 +73,27 @@ Note: This codebase was largely generated with [Claude Code](https://www.anthrop
     ```
 3.  **Create Environment File:**
     Create a file named `.env` in the project root.
-4.  **Add API Key:**
-    Add your OpenAI API key to the `.env` file:
+4.  **Configure AWS Bedrock:**
+
+    **Step 1: Generate a Bedrock API Key**
+    *   Open the [AWS Bedrock Console](https://console.aws.amazon.com/bedrock/)
+    *   Navigate to "API Keys" in the left sidebar
+    *   Click "Create API Key"
+    *   Choose either:
+        *   **Long-term key** (30 days) - Good for testing and development
+        *   **Short-term key** (up to 12 hours) - Recommended for production
+    *   Save the generated API key securely (it won't be shown again!)
+
+    **Step 2: Add Configuration to `.env`**
     ```dotenv
     # Required for the AI player functionality
-    OPENAI_API_KEY=your_api_key_here
+    BEDROCK_API_KEY=your_bedrock_api_key_here
+    AWS_REGION=us-east-1
     ```
-    *   **Important:** Ensure the `.env` file is added to your `.gitignore` file to avoid committing your secret key!
+
+    *   **Important:** Ensure the `.env` file is added to your `.gitignore` file to avoid committing your API key!
+    *   **Note:** Your AWS account must have access to the `openai.gpt-oss-120b-1:0` model in AWS Bedrock.
+    *   **Security:** Consider using short-term keys for production deployments
 5.  **Ensure `.gitignore`:** Verify that `.env` and `node_modules/` are listed in your `.gitignore` file.
 
 ## Running the Project

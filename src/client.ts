@@ -1,85 +1,19 @@
 // Client-side game logic
 import { io, type Socket as SocketIOClient } from "socket.io-client";
-
-// Define types
-interface Player {
-	id: string;
-	name: string;
-	score: number;
-	isAI?: boolean;
-	answer?: string;
-	time?: number;
-	roomCode?: string;
-	isReady?: boolean;
-}
-
-interface PublicAnswer {
-	name: string;
-	answer: string;
-	time?: number;
-}
-
-interface VoteData {
-	participants: Record<string, Player>;
-	aiPlayer: Player;
-}
-
-interface VoteResults {
-	players: Record<string, Player>;
-	winners: string[];
-	message: string;
-	aiPlayer: Player;
-	allRoundsVotes?: Array<{
-		roundNumber: number;
-		votes: Record<string, string>; // voterId -> votedForId
-	}>;
-	currentRound?: number;
-	totalRounds?: number;
-	isLastRound?: boolean;
-	revealAI?: boolean;
-	playerVotesReceived?: Record<string, number>; // playerId -> number of votes received
-	playerAIDetectionSuccess?: Record<string, number>; // playerId -> number of correct AI detections
-	combinedImposterPrompt?: string; // The combined imposter prompt used for the AI
-	playerImposterPrompts?: Record<string, string>; // Individual player imposter prompts
-	currentPrompt?: string; // The prompt that was used in the round
-	questionPromptCount?: number; // How many question generation prompts were submitted
-	combinedQuestionPrompt?: string; // The combined prompt used for question generation
-	playerQuestionPrompts?: Record<string, string>; // Individual player question prompts
-}
-
-interface RoomData {
-	roomCode: string;
-	player: Player;
-	isReconnection?: boolean;
-}
-
-interface GameComplete {
-	playerAIDetectionSuccess: Record<string, number>;
-	playerVotesReceived: Record<string, number>;
-	aiPlayer: Player;
-	players: Record<string, Player>;
-	questionPromptCount?: number;
-	combinedQuestionPrompt?: string;
-	combinedImposterPrompt?: string;
-	playerImposterPrompts?: Record<string, string>;
-	playerQuestionPrompts?: Record<string, string>;
-	currentPrompt?: string;
-	allRoundsVotes?: Array<{
-		roundNumber: number;
-		votes: Record<string, string>;
-	}>;
-	roundsHistory?: Array<{
-		roundNumber: number;
-		prompt: string;
-		answers: Record<
-			string,
-			{
-				playerId: string;
-				answer: string;
-			}
-		>;
-	}>;
-}
+import type {
+	GameComplete,
+	Player,
+	PublicAnswer,
+	RoomData,
+	VoteData,
+	VoteResults,
+} from "./types";
+import {
+	showElement,
+	showErrorMessage,
+	showSuccessMessage,
+	updateStatusMessage,
+} from "./utils/uiHelpers";
 
 // Socket.io connection
 let socket: SocketIOClient;
@@ -201,11 +135,8 @@ document.addEventListener("DOMContentLoaded", () => {
 		myPlayerId = socket.id ?? "";
 
 		// Make sure status message is visible
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.classList.remove("hidden");
-			statusMessage.textContent = "Create a new room or join an existing one!";
-		}
+		showElement("status-message");
+		updateStatusMessage("Create a new room or join an existing one!");
 
 		// Check if room code and player name are in URL parameters
 		const roomCode = getUrlParameter("room");
@@ -237,10 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	// Room selection is now shown by default on page load, so this just updates the message
 	socket.on("show_room_selection", () => {
 		// Update status message
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.textContent = "Create a new room or join an existing one!";
-		}
+		updateStatusMessage("Create a new room or join an existing one!");
 	});
 
 	// Function to reset color assignments when joining a new room
@@ -264,11 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		handleRoomJoined(data);
 
 		// Show success message
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.textContent =
-				"Room created! Waiting for players to join...";
-		}
+		showSuccessMessage("Room created! Waiting for players to join...");
 
 		// Hide GitHub link when creating a room
 		const githubLink = document.getElementById("github-link");
@@ -285,14 +209,10 @@ document.addEventListener("DOMContentLoaded", () => {
 		handleRoomJoined(data);
 
 		// Show success message
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			if (data.isReconnection) {
-				statusMessage.textContent = "Successfully reconnected to room!";
-			} else {
-				statusMessage.textContent =
-					"Room joined! Waiting for the game to start...";
-			}
+		if (data.isReconnection) {
+			showSuccessMessage("Successfully reconnected to room!");
+		} else {
+			showSuccessMessage("Room joined! Waiting for the game to start...");
 		}
 
 		// Hide GitHub link when joining a room
@@ -305,18 +225,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	// Handle room error event
 	socket.on("room_error", (errorMessage: string) => {
 		// Show error message
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.textContent = `Error: ${errorMessage}`;
-			statusMessage.classList.remove("bg-blue-500");
-			statusMessage.classList.add("bg-red-500");
-
-			// Reset back to blue after 3 seconds
-			setTimeout(() => {
-				statusMessage.classList.remove("bg-red-500");
-				statusMessage.classList.add("bg-blue-500");
-			}, 3000);
-		}
+		showErrorMessage(`Error: ${errorMessage}`);
 
 		// Clear room code from URL if it exists in the query parameters
 		const roomCode = getUrlParameter("room");
@@ -406,10 +315,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	 */
 	function setGamePhase(message: string): void {
 		// Update status message with the current game phase
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.textContent = message;
-		}
+		updateStatusMessage(message);
 	}
 
 	// Handle start challenge event
@@ -569,10 +475,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 	// Handle status update event
 	socket.on("status_update", (message: string) => {
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.textContent = message;
-		}
+		updateStatusMessage(message);
 
 		// Handle special status messages for reconnection cases
 		if (message === "You already submitted an answer. Waiting for others...") {
@@ -655,11 +558,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	socket.on("show_public_answers", (publicAnswers: PublicAnswer[]) => {
 		// Update game state to show answers
 
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.textContent =
-				"Review all answers. Who do you think is the AI?";
-		}
+		updateStatusMessage("Review all answers. Who do you think is the AI?");
 
 		// Display all answers
 		const answersArea = document.getElementById("public-answers-area");
@@ -707,10 +606,7 @@ document.addEventListener("DOMContentLoaded", () => {
 						answerCard.classList.add("selected-answer");
 
 						// Update status
-						const statusMsg = document.getElementById("status-message");
-						if (statusMsg) {
-							statusMsg.textContent = "Vote cast! Waiting for results...";
-						}
+						updateStatusMessage("Vote cast! Waiting for results...");
 					} else if (playerEntry && playerEntry[0] === myPlayerId) {
 						// Can't vote for yourself
 						answerCard.classList.add("cannot-vote");
@@ -840,16 +736,13 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 
 		// Update status with result message
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			// Only show the message as-is if it's the last round
-			// Otherwise, keep it generic to avoid revealing AI identity
-			if (isLastRound) {
-				statusMessage.textContent = message;
-			} else {
-				// Use a generic message that doesn't indicate if the AI was detected
-				statusMessage.textContent = `Round ${currentRound} of ${totalRounds} complete!`;
-			}
+		// Only show the message as-is if it's the last round
+		// Otherwise, keep it generic to avoid revealing AI identity
+		if (isLastRound) {
+			updateStatusMessage(message);
+		} else {
+			// Use a generic message that doesn't indicate if the AI was detected
+			updateStatusMessage(`Round ${currentRound} of ${totalRounds} complete!`);
 		}
 
 		// Hide game elements
@@ -1163,10 +1056,9 @@ document.addEventListener("DOMContentLoaded", () => {
 	// Handle rounds configuration
 	socket.on("rounds_set", (totalRounds: number) => {
 		// Update UI to show number of rounds configured
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.textContent = `Game configured for ${totalRounds} rounds. Ready to start!`;
-		}
+		updateStatusMessage(
+			`Game configured for ${totalRounds} rounds. Ready to start!`,
+		);
 
 		// Create and show a round info banner at the top if it doesn't exist yet
 		const roomInfoArea = document.getElementById("room-info-area");
@@ -1366,10 +1258,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		}
 
 		// Update status message
-		const statusMessage = document.getElementById("status-message");
-		if (statusMessage) {
-			statusMessage.textContent = "Game complete! All rounds finished.";
-		}
+		updateStatusMessage("Game complete! All rounds finished.");
 
 		// Create a dedicated final results page
 		createFinalResultsPage(data);
@@ -1908,18 +1797,7 @@ function setupEventListeners(): void {
 				socket.emit("join_room", roomCode);
 			} else {
 				// Show error if no room code entered
-				const statusMessage = document.getElementById("status-message");
-				if (statusMessage) {
-					statusMessage.textContent = "Please enter a room code.";
-					statusMessage.classList.remove("bg-blue-500");
-					statusMessage.classList.add("bg-red-500");
-
-					// Reset back to blue after 3 seconds
-					setTimeout(() => {
-						statusMessage.classList.remove("bg-red-500");
-						statusMessage.classList.add("bg-blue-500");
-					}, 3000);
-				}
+				showErrorMessage("Please enter a room code.");
 			}
 		});
 
@@ -2024,11 +1902,9 @@ function setupEventListeners(): void {
 				}
 
 				// Update status message
-				const statusMessage = document.getElementById("status-message");
-				if (statusMessage) {
-					statusMessage.textContent =
-						"You have left the room. Create a new room or join an existing one!";
-				}
+				updateStatusMessage(
+					"You have left the room. Create a new room or join an existing one!",
+				);
 
 				// Show GitHub link again when exiting a room
 				const githubLink = document.getElementById("github-link");
@@ -2169,11 +2045,7 @@ function setupEventListeners(): void {
 				}, 1000);
 
 				// Update status to show error
-				const statusMessage = document.getElementById("status-message");
-				if (statusMessage) {
-					statusMessage.textContent =
-						"Please enter an answer before submitting.";
-				}
+				updateStatusMessage("Please enter an answer before submitting.");
 				return;
 			}
 
@@ -2193,10 +2065,7 @@ function setupEventListeners(): void {
 			}
 
 			// Update status
-			const statusMessage = document.getElementById("status-message");
-			if (statusMessage) {
-				statusMessage.textContent = "Answer submitted! Waiting for others...";
-			}
+			updateStatusMessage("Answer submitted! Waiting for others...");
 		});
 	}
 }
@@ -2449,10 +2318,7 @@ function castVote(votedPlayerId: string): void {
 	socket.emit("cast_vote", votedPlayerId);
 
 	// Update status
-	const statusMessage = document.getElementById("status-message");
-	if (statusMessage) {
-		statusMessage.textContent = "Vote cast! Waiting for results...";
-	}
+	updateStatusMessage("Vote cast! Waiting for results...");
 }
 
 // Setup character counters for all textareas with maxlength

@@ -44,4 +44,4 @@ function extractTextFromResponse(response: OpenAIResponse): string {
 	}
 }
 
-export { extractTextFromResponse, removeEmojis };
+export { extractTextFromResponse };

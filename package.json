@@ -16,7 +16,9 @@
 		"format": "biome format --write .",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"knip": "knip",
+		"check": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run knip"
 	},
 	"engines": {
 		"node": ">=18.0.0"
@@ -36,8 +38,8 @@
 		"@types/express": "5.0.5",
 		"@types/node": "24.10.0",
 		"concurrently": "9.2.1",
+		"knip": "^5.69.0",
 		"tailwindcss": "4.1.16",
-		"ts-node": "10.9.2",
 		"ts-node-dev": "2.0.0",
 		"typescript": "5.9.3",
 		"vite": "7.2.1",
