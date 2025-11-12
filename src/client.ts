@@ -1,11 +1,16 @@
 // Client-side game logic
-import { io, type Socket as SocketIOClient } from "socket.io-client";
+
+import type { Socket } from "socket.io-client";
+import { io } from "socket.io-client";
+import type {
+	ClientToServerEvents,
+	ServerToClientEvents,
+} from "./socketEvents";
 import type {
 	GameComplete,
 	Player,
 	PublicAnswer,
 	RoomData,
-	VoteData,
 	VoteResults,
 } from "./types";
 import {
@@ -16,7 +21,7 @@ import {
 } from "./utils/uiHelpers";
 
 // Socket.io connection
-let socket: SocketIOClient;
+let socket: Socket<ServerToClientEvents, ClientToServerEvents>;
 let myPlayerId = "";
 let myRoomCode = ""; // Will store the current room code
 let playerVotesReceived: Record<string, number> = {}; // Track votes received by each player
@@ -319,108 +324,131 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	// Handle start challenge event
-	socket.on(
-		"start_challenge",
-		(data: {
-			prompt: string;
-			duration: number;
-			currentRound?: number;
-			totalRounds?: number;
-		}) => {
-			// Show answer area and switch to game layout
-			const gameGrid = document.getElementById("game-grid");
-			const answerArea = document.getElementById("answer-area");
+	socket.on("start_challenge", (data) => {
+		// Show answer area and switch to game layout
+		const gameGrid = document.getElementById("game-grid");
+		const answerArea = document.getElementById("answer-area");
 
-			if (gameGrid) {
-				// Remove waiting-state class to show the normal game grid layout
-				gameGrid.classList.remove("waiting-state");
-			}
+		if (gameGrid) {
+			// Remove waiting-state class to show the normal game grid layout
+			gameGrid.classList.remove("waiting-state");
+		}
 
-			if (answerArea) {
-				// Show the answer area now that the game is starting
-				answerArea.classList.remove("hidden");
-			}
+		if (answerArea) {
+			// Show the answer area now that the game is starting
+			answerArea.classList.remove("hidden");
+		}
 
-			// Exit room button remains visible during gameplay
+		// Exit room button remains visible during gameplay
 
-			// Display the prompt
-			const promptArea = document.getElementById("prompt-area");
-			if (promptArea) {
-				// Update the round info in the room info area
-				if (data.currentRound && data.totalRounds) {
-					// Look for existing rounds info or create it
-					const roomInfoArea = document.getElementById("room-info-area");
-					if (roomInfoArea) {
-						let roundsInfo = document.getElementById("rounds-info");
-						if (!roundsInfo) {
-							// Create the rounds info element if it doesn't exist
-							roundsInfo = document.createElement("div");
-							roundsInfo.id = "rounds-info";
-							roundsInfo.className = "rounds-counter";
-							const flexContainer = roomInfoArea.querySelector(".flex");
-							if (flexContainer) {
-								flexContainer.appendChild(roundsInfo);
-							}
-						}
-						// Update the rounds info to show current round
-						roundsInfo.textContent = `Round ${data.currentRound} of ${data.totalRounds}`;
+		// Display the prompt
+		const promptArea = document.getElementById("prompt-area");
+		if (promptArea) {
+			// Update the round info in the room info area
+			if (data.currentRound && data.totalRounds) {
+				// Look for existing rounds info or create it
+				const roomInfoArea = document.getElementById("room-info-area");
+				if (roomInfoArea) {
+					let roundsInfo = document.getElementById("rounds-info");
+					if (!roundsInfo) {
+						// Create the rounds info element if it doesn't exist
+						roundsInfo = document.createElement("div");
+						roundsInfo.id = "rounds-info";
 						roundsInfo.className = "rounds-counter";
+						const flexContainer = roomInfoArea.querySelector(".flex");
+						if (flexContainer) {
+							flexContainer.appendChild(roundsInfo);
+						}
 					}
+					// Update the rounds info to show current round
+					roundsInfo.textContent = `Round ${data.currentRound} of ${data.totalRounds}`;
+					roundsInfo.className = "rounds-counter";
 				}
-
-				// Display just the prompt without round number
-				promptArea.textContent = data.prompt;
-
-				// Show player list header elements
-				const playerTitle = document.querySelector("#player-list-container h2");
-				const votesReceivedLabel = document.querySelector(
-					"#player-list-container .text-gray-500",
-				);
-
-				if (playerTitle) {
-					playerTitle.classList.remove("hidden");
-					playerTitle.textContent = "Players";
-				}
-
-				if (votesReceivedLabel) {
-					votesReceivedLabel.classList.remove("hidden");
-				}
-
-				// Force player list refresh to show all players now that game has started
-				socket.emit("request_players_update");
 			}
 
-			// Check if this is a normal challenge or a reconnection
-			const isReconnection = data.duration === 0;
+			// Display just the prompt without round number
+			promptArea.textContent = data.prompt;
 
-			// Show and enable the input and submit button
-			const answerInput = document.getElementById(
-				"answer-input",
-			) as HTMLTextAreaElement;
-			const submitButton = document.getElementById(
-				"submit-answer-button",
-			) as HTMLButtonElement;
-			const counterElement = document.getElementById("answer-input-counter");
+			// Show player list header elements
+			const playerTitle = document.querySelector("#player-list-container h2");
+			const votesReceivedLabel = document.querySelector(
+				"#player-list-container .text-gray-500",
+			);
 
-			if (answerInput && submitButton) {
-				// Always make elements visible
-				answerInput.classList.remove("hidden");
-				submitButton.classList.remove("hidden");
+			if (playerTitle) {
+				playerTitle.classList.remove("hidden");
+				playerTitle.textContent = "Players";
+			}
 
-				// Show character counter
+			if (votesReceivedLabel) {
+				votesReceivedLabel.classList.remove("hidden");
+			}
+
+			// Force player list refresh to show all players now that game has started
+			socket.emit("request_players_update");
+		}
+
+		// Check if this is a normal challenge or a reconnection
+		const isReconnection = data.duration === 0;
+
+		// Show and enable the input and submit button
+		const answerInput = document.getElementById(
+			"answer-input",
+		) as HTMLTextAreaElement;
+		const submitButton = document.getElementById(
+			"submit-answer-button",
+		) as HTMLButtonElement;
+		const counterElement = document.getElementById("answer-input-counter");
+
+		if (answerInput && submitButton) {
+			// Always make elements visible
+			answerInput.classList.remove("hidden");
+			submitButton.classList.remove("hidden");
+
+			// Show character counter
+			if (counterElement) {
+				counterElement.classList.remove("hidden");
+			}
+
+			if (!isReconnection) {
+				// Normal challenge - enable input and clear value
+				answerInput.value = "";
+				answerInput.disabled = false;
+				submitButton.disabled = false;
+
+				// Reset character counter
 				if (counterElement) {
-					counterElement.classList.remove("hidden");
+					counterElement.textContent = `${answerInput.maxLength} characters remaining`;
+					counterElement.classList.remove(
+						"text-yellow-500",
+						"text-red-500",
+						"font-semibold",
+					);
+					counterElement.classList.add("text-gray-500");
 				}
+			} else {
+				// For reconnection, we'll initially enable the input
+				// The server will tell us if we've already answered via status_update event
+				answerInput.disabled = false;
+				submitButton.disabled = false;
 
-				if (!isReconnection) {
-					// Normal challenge - enable input and clear value
-					answerInput.value = "";
-					answerInput.disabled = false;
-					submitButton.disabled = false;
+				// Update counter based on current value
+				if (counterElement) {
+					const remaining = answerInput.maxLength - answerInput.value.length;
+					counterElement.textContent = `${remaining} characters remaining`;
 
-					// Reset character counter
-					if (counterElement) {
-						counterElement.textContent = `${answerInput.maxLength} characters remaining`;
+					// Style the counter based on remaining characters
+					if (remaining <= 20) {
+						counterElement.classList.remove("text-gray-500");
+						counterElement.classList.add("text-red-500", "font-semibold");
+					} else if (remaining <= 50) {
+						counterElement.classList.remove(
+							"text-gray-500",
+							"text-red-500",
+							"font-semibold",
+						);
+						counterElement.classList.add("text-yellow-500");
+					} else {
 						counterElement.classList.remove(
 							"text-yellow-500",
 							"text-red-500",
@@ -428,50 +456,19 @@ document.addEventListener("DOMContentLoaded", () => {
 						);
 						counterElement.classList.add("text-gray-500");
 					}
-				} else {
-					// For reconnection, we'll initially enable the input
-					// The server will tell us if we've already answered via status_update event
-					answerInput.disabled = false;
-					submitButton.disabled = false;
-
-					// Update counter based on current value
-					if (counterElement) {
-						const remaining = answerInput.maxLength - answerInput.value.length;
-						counterElement.textContent = `${remaining} characters remaining`;
-
-						// Style the counter based on remaining characters
-						if (remaining <= 20) {
-							counterElement.classList.remove("text-gray-500");
-							counterElement.classList.add("text-red-500", "font-semibold");
-						} else if (remaining <= 50) {
-							counterElement.classList.remove(
-								"text-gray-500",
-								"text-red-500",
-								"font-semibold",
-							);
-							counterElement.classList.add("text-yellow-500");
-						} else {
-							counterElement.classList.remove(
-								"text-yellow-500",
-								"text-red-500",
-								"font-semibold",
-							);
-							counterElement.classList.add("text-gray-500");
-						}
-					}
 				}
 			}
+		}
 
-			// Only clear previous results for new challenges (not reconnections)
-			if (!isReconnection) {
-				clearElementContent("public-answers-area");
-				clearElementContent("voting-area");
+		// Only clear previous results for new challenges (not reconnections)
+		if (!isReconnection) {
+			clearElementContent("public-answers-area");
+			clearElementContent("voting-area");
 
-				// Set up the challenge phase with timer if it's a new challenge
-				setGamePhase("Answer the question when ready.");
-			}
-		},
-	);
+			// Set up the challenge phase with timer if it's a new challenge
+			setGamePhase("Answer the question when ready.");
+		}
+	});
 
 	// Handle status update event
 	socket.on("status_update", (message: string) => {
@@ -661,7 +658,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	});
 
 	// Handle start voting event
-	socket.on("start_voting", (data: VoteData) => {
+	socket.on("start_voting", (data) => {
 		// Store participants for looking up player IDs
 		Object.assign(currentPlayers, data.participants);
 

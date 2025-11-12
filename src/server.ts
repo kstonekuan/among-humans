@@ -5,6 +5,7 @@ import express from "express";
 import OpenAI from "openai";
 import { Server } from "socket.io";
 import { extractTextFromResponse } from "./openai-patch";
+import type { TypedServer } from "./socketEvents";
 import type { Player, Room } from "./types";
 import {
 	analyzeCasingFromHumanAnswers,
@@ -55,7 +56,7 @@ const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 
 const httpServer = http.createServer(app);
 
-const io = new Server(httpServer);
+const io: TypedServer = new Server(httpServer);
 
 // Serve static files from Vite build output in production
 // In development, Vite dev server handles the client on port 5173

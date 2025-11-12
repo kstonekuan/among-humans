@@ -1,5 +1,12 @@
 // Shared type definitions for client and server
 
+// Re-export Socket.IO event types for convenience
+export type {
+	ClientToServerEvents,
+	ServerToClientEvents,
+	TypedServer,
+} from "./socketEvents";
+
 // Base player type with all possible properties
 export type Player = {
 	id: string;
@@ -73,16 +80,11 @@ export type PublicAnswer = {
 	time?: number;
 };
 
-export type VoteData = {
-	participants: Record<string, Player>;
-	aiPlayer: Player;
-};
-
 export type VoteResults = {
 	players: Record<string, Player>;
 	winners: string[];
 	message: string;
-	aiPlayer: Player;
+	aiPlayer: { id: string; name: string };
 	allRoundsVotes?: Array<{
 		roundNumber: number;
 		votes: Record<string, string>;
@@ -95,7 +97,7 @@ export type VoteResults = {
 	playerAIDetectionSuccess?: Record<string, number>;
 	combinedImposterPrompt?: string;
 	playerImposterPrompts?: Record<string, string>;
-	currentPrompt?: string;
+	currentPrompt?: string | null;
 	questionPromptCount?: number;
 	combinedQuestionPrompt?: string;
 	playerQuestionPrompts?: Record<string, string>;
@@ -110,14 +112,14 @@ export type RoomData = {
 export type GameComplete = {
 	playerAIDetectionSuccess: Record<string, number>;
 	playerVotesReceived: Record<string, number>;
-	aiPlayer: Player;
+	aiPlayer: { id: string; name: string };
 	players: Record<string, Player>;
 	questionPromptCount?: number;
 	combinedQuestionPrompt?: string;
 	combinedImposterPrompt?: string;
 	playerImposterPrompts?: Record<string, string>;
 	playerQuestionPrompts?: Record<string, string>;
-	currentPrompt?: string;
+	currentPrompt?: string | null;
 	allRoundsVotes?: Array<{
 		roundNumber: number;
 		votes: Record<string, string>;
