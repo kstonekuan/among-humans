@@ -20,6 +20,13 @@ function removeEmojis(text: string): string {
 		.trim();
 }
 
+// Helper function to remove reasoning tags from AWS Bedrock responses
+// AWS Bedrock's OpenAI models wrap reasoning in <reasoning> tags that precede the actual answer
+function removeReasoningTags(text: string): string {
+	// Remove <reasoning>...</reasoning> tags and their content
+	return text.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "").trim();
+}
+
 // Helper function to safely extract text from OpenAI response
 function extractTextFromResponse(response: OpenAIResponse): string {
 	try {
@@ -35,6 +42,9 @@ function extractTextFromResponse(response: OpenAIResponse): string {
 		} else if (choice.text) {
 			extractedText = choice.text.trim();
 		}
+
+		// Remove reasoning tags (AWS Bedrock OpenAI models include <reasoning> tags)
+		extractedText = removeReasoningTags(extractedText);
 
 		// Remove emojis from the extracted text
 		return removeEmojis(extractedText);
