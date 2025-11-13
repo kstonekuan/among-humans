@@ -161,7 +161,7 @@ This application is configured for deployment on AWS App Runner, which provides 
    - Select the repository and branch (main)
    - Build settings: Choose "Use a configuration file" and specify `apprunner.yaml`
    - Or manually configure:
-     - Runtime: Node.js 18
+     - Runtime: Node.js 22
      - Build command: `npm install -g pnpm && pnpm install && pnpm run build:server && pnpm run build:client`
      - Start command: `pnpm start`
      - Port: 3000
@@ -194,22 +194,6 @@ docker run -p 3000:3000 \
 
 # Access at http://localhost:3000
 ```
-
-### Deployment Costs
-
-AWS App Runner pricing (approximate):
-- **Provisioned**: $0.064/hour (~$46/month) + $0.064/GB per month
-- **Active usage**: Additional charges for request processing
-- **Free tier**: 360 vCPU-hours and 720 GB-hours per month
-
-### Alternative Deployment Options
-
-While this project is optimized for AWS App Runner, you can also deploy to:
-- **AWS Elastic Beanstalk**: Traditional PaaS with more configuration options
-- **AWS ECS Fargate**: Container orchestration with more control
-- **AWS EC2**: Full control but more management overhead
-
-**Note:** AWS Amplify Hosting is **not recommended** as it doesn't support WebSocket connections required for Socket.IO.
 
 ## Planned Enhancements
 
