@@ -4,7 +4,7 @@
 
 **A Real-Time Multiplayer Social Deduction Game**
 
-**Play now: [https://among-humans.onrender.com/](https://among-humans.onrender.com/)**
+**Play now: [Coming Soon - AWS App Runner Deployment]**
 
 ---
 
@@ -88,7 +88,7 @@ Note: This codebase was largely generated with [Claude Code](https://www.anthrop
     ```dotenv
     # Required for the AI player functionality
     BEDROCK_API_KEY=your_bedrock_api_key_here
-    AWS_REGION=us-east-1
+    AWS_REGION=us-west-2
     ```
 
     *   **Important:** Ensure the `.env` file is added to your `.gitignore` file to avoid committing your API key!
@@ -131,6 +131,85 @@ This project is an actively developed social deduction game with the following f
 * Implemented more robust error handling
 * Added visual feedback for game actions (votes, submissions, etc.)
 * Added exit room functionality
+
+## Deployment
+
+### AWS App Runner (Recommended)
+
+This application is configured for deployment on AWS App Runner, which provides native WebSocket support required for Socket.IO real-time communication.
+
+**Prerequisites:**
+- AWS Account
+- AWS CLI installed and configured
+- Docker installed (for local testing)
+
+**Deployment Options:**
+
+#### Deploy via AWS Console (Easiest)
+
+1. **Push your code to GitHub**
+   ```bash
+   git add .
+   git commit -m "Add AWS App Runner configuration"
+   git push origin main
+   ```
+
+2. **Create App Runner Service**
+   - Go to [AWS App Runner Console](https://console.aws.amazon.com/apprunner/)
+   - Click "Create service"
+   - Choose "Source code repository" and connect to your GitHub repo
+   - Select the repository and branch (main)
+   - Build settings: Choose "Use a configuration file" and specify `apprunner.yaml`
+   - Or manually configure:
+     - Runtime: Node.js 18
+     - Build command: `npm install -g pnpm && pnpm install && pnpm run build:server && pnpm run build:client`
+     - Start command: `pnpm start`
+     - Port: 3000
+
+3. **Configure Environment Variables**
+   - In the service configuration, add:
+     - `BEDROCK_API_KEY`: Your AWS Bedrock API key
+     - `AWS_REGION`: Your AWS region (e.g., us-west-2)
+     - `NODE_ENV`: production
+
+4. **Deploy**
+   - Click "Create & deploy"
+   - Wait for deployment to complete (~5-10 minutes)
+   - Access your app at the provided App Runner URL
+
+#### Local Testing with Docker
+
+Before deploying, test the Docker build locally:
+
+```bash
+# Build the image
+docker build -t among-humans .
+
+# Run the container
+docker run -p 3000:3000 \
+  -e BEDROCK_API_KEY=your_key_here \
+  -e AWS_REGION=us-west-2 \
+  -e NODE_ENV=production \
+  among-humans
+
+# Access at http://localhost:3000
+```
+
+### Deployment Costs
+
+AWS App Runner pricing (approximate):
+- **Provisioned**: $0.064/hour (~$46/month) + $0.064/GB per month
+- **Active usage**: Additional charges for request processing
+- **Free tier**: 360 vCPU-hours and 720 GB-hours per month
+
+### Alternative Deployment Options
+
+While this project is optimized for AWS App Runner, you can also deploy to:
+- **AWS Elastic Beanstalk**: Traditional PaaS with more configuration options
+- **AWS ECS Fargate**: Container orchestration with more control
+- **AWS EC2**: Full control but more management overhead
+
+**Note:** AWS Amplify Hosting is **not recommended** as it doesn't support WebSocket connections required for Socket.IO.
 
 ## Planned Enhancements
 

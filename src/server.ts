@@ -63,7 +63,7 @@ const io: TypedServer = new Server(httpServer);
 if (process.env.NODE_ENV === "production") {
 	app.use(express.static(path.join(__dirname, "client")));
 	// Serve index.html for all routes (SPA fallback)
-	app.get("*", (_req, res) => {
+	app.get("/*path", (_req, res) => {
 		res.sendFile(path.join(__dirname, "client/index.html"));
 	});
 }
